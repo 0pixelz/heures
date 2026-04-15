@@ -210,6 +210,10 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
 .save-btn { width: 100%; background: var(--accent); color: var(--bg); border: none; padding: 13px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; cursor: pointer; transition: opacity 0.2s; margin-top: 8px; }
 .save-btn:hover { opacity: 0.85; }
 
+/* INSTALL BUTTON */
+#install-btn { display: none; background: var(--accent); color: var(--bg); border: none; padding: 8px 14px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+#install-btn:hover { opacity: 0.85; }
+
 /* RESPONSIVE */
 @media (max-width: 650px) {
   header { padding: 14px 16px; }
@@ -232,6 +236,7 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
     <h1>Suivi<span>Heures</span></h1>
   </div>
   <div class="header-actions">
+    <button id="install-btn" onclick="installPWA()">📲 Installer</button>
     <button class="hdr-btn" onclick="openCalendar()">📅 Calendrier</button>
     <button class="hdr-btn" onclick="openSettings()">⚙ Paramètres</button>
   </div>
@@ -840,6 +845,28 @@ function saveSettings() {
 
 document.getElementById('cal-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeCalendar(); });
 document.getElementById('settings-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeSettings(); });
+
+// ================================================================
+// PWA INSTALL
+// ================================================================
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('install-btn').style.display = 'block';
+});
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    deferredInstallPrompt = null;
+    document.getElementById('install-btn').style.display = 'none';
+  });
+}
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  document.getElementById('install-btn').style.display = 'none';
+});
 
 // ================================================================
 // INIT
