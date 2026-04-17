@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f0e0d" id="themeColorMeta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Heures sup." />
+  <title>Heures supplémentaires</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f0e0d;
+      --bg-elev: #1a1917;
+      --bg-elev-2: #23211e;
+      --border: #2e2b27;
+      --border-strong: #3d3933;
+      --text: #f5f1ea;
+      --text-dim: #a8a097;
+      --text-faint: #6b6359;
+      --accent: #e8a046;
+      --accent-soft: rgba(232, 160, 70, 0.15);
+      --accent-text: #ffb95a;
+      --danger: #e56b6b;
+      --success: #7bb876;
+      --leave: #8a7fc4;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 20px rgba(0,0,0,0.3);
+      --font-display: 'Instrument Serif', Georgia, serif;
+      --font-body: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg: #faf8f3;
+      --bg-elev: #ffffff;
+      --bg-elev-2: #f2ede3;
+      --border: #e5ddcd;
+      --border-strong: #d0c5af;
+      --text: #1a1815;
+      --text-dim: #5a5248;
+      --text-faint: #8a7f70;
+      --accent: #c17a1f;
+      --accent-soft: rgba(193, 122, 31, 0.12);
+      --accent-text: #a86515;
+      --danger: #c14d4d;
+      --success: #4a8245;
+      --leave: #6b5fa8;
+      --shadow: 0 1px 2px rgba(60,40,20,0.06), 0 4px 16px rgba(60,40,20,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overscroll-behavior-y: contain;
+    }
+
+    body {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: max(env(safe-area-inset-top), 20px) 18px max(env(safe-area-inset-bottom), 28px);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    /* ============ HEADER ============ */
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand h1 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      font-size: 32px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      font-style: italic;
+    }
+
+    .brand .subtitle {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-faint);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 16px;
+    }
+
+    .icon-btn:hover, .icon-btn:active { background: var(--bg-elev-2); transform: scale(0.97); }
+
+    #installBtn {
+      width: auto;
+      padding: 0 14px;
+      border-radius: 20px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      gap: 6px;
+      display: none;
+    }
+
+    #installBtn.show { display: inline-flex; }
+
+    /* ============ CARDS ============ */
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .card-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-faint);
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+
+    /* ============ DATE NAVIGATION ============ */
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .date-display {
+      flex: 1;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-family: var(--font-body);
+      color: var(--text);
+      font-size: 15px;
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .date-display::after {
+      content: '';
+      width: 8px; height: 8px;
+      border-right: 1.5px solid var(--text-dim);
+      border-bottom: 1.5px solid var(--text-dim);
+      transform: rotate(45deg);
+      margin-left: 8px;
+      margin-top: -4px;
+    }
+
+    .date-day {
+      text-transform: capitalize;
+      font-weight: 500;
+    }
+
+    .date-full {
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .date-display input[type="date"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      border: none;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .nav-btn {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nav-btn:active { transform: scale(0.95); background: var(--bg-elev-2); }
+
+    /* ============ TYPE TOGGLE ============ */
+    .type-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg-elev-2);
+      border-radius: var(--radius-sm);
+      margin-bottom: 18px;
+    }
+
+    .type-toggle button {
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .type-toggle button.active {
+      background: var(--bg-elev);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    /* ============ FORM FIELDS ============ */
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+
+    .field input, .field select, .full-field input, .full-field select, textarea {
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .field input[type="time"], .field input[type="date"] {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .field select, .full-field select {
+      font-family: var(--font-body);
+      font-weight: 500;
+      padding-right: 36px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a8a097' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 10px;
+    }
+
+    .field select option, .full-field select option {
+      background: var(--bg-elev);
+      color: var(--text);
+    }
+
+    .field input:focus, .field select:focus, .full-field input:focus, .full-field select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--bg-elev);
+    }
+
+    textarea {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 14px;
+      resize: none;
+      min-height: 72px;
+      line-height: 1.5;
+    }
+
+    .full-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .full-field > label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+
+    /* ============ SUMMARY ============ */
+    .day-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding-top: 16px;
+      margin-top: 16px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .day-summary-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+
+    .day-summary-value {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 36px;
+      color: var(--accent-text);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .overtime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .save-pulse {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      margin-right: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .save-pulse.visible { opacity: 1; animation: pulse 1.2s ease-out; }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 var(--success); opacity: 1; }
+      100% { box-shadow: 0 0 0 8px transparent; opacity: 0.6; }
+    }
+
+    /* ============ PROGRESS BAR ============ */
+    .progress-card .progress-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+
+    .week-range {
+      color: var(--text-dim);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-value {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 42px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .progress-value .sep {
+      color: var(--text-faint);
+      margin: 0 6px;
+      font-size: 28px;
+    }
+
+    .progress-value .target {
+      color: var(--text-faint);
+      font-size: 24px;
+    }
+
+    .bar-wrap {
+      height: 10px;
+      background: var(--bg-elev-2);
+      border-radius: 99px;
+      overflow: hidden;
+      position: relative;
+      margin: 14px 0 8px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-text) 100%);
+      border-radius: 99px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .bar-fill.overtime::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(45deg, transparent 0, transparent 4px, rgba(255,255,255,0.2) 4px, rgba(255,255,255,0.2) 6px);
+    }
+
+    .progress-legend {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 8px;
+    }
+
+    /* ============ CALENDAR ============ */
+    .cal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .cal-month {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      text-transform: capitalize;
+    }
+
+    .cal-nav {
+      display: flex;
+      gap: 6px;
+    }
+
+    .cal-nav button {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .cal-nav button:active { background: var(--bg-elev-2); }
+
+    .cal-weekdays, .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .cal-weekdays {
+      margin-bottom: 8px;
+    }
+
+    .cal-weekdays span {
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+      padding: 4px 0;
+    }
+
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: var(--radius-xs);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s;
+      padding: 4px;
+    }
+
+    .cal-day:hover:not(.empty) { background: var(--bg-elev-2); }
+
+    .cal-day.empty { cursor: default; opacity: 0.3; }
+    .cal-day.other-month { color: var(--text-faint); }
+    .cal-day.today { border-color: var(--accent); }
+    .cal-day.selected { background: var(--accent); color: #fff; }
+    .cal-day.selected .cal-dot { background: rgba(255,255,255,0.8); }
+
+    .cal-day.has-entry .cal-day-num { font-weight: 600; }
+
+    .cal-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      margin-top: 2px;
+      background: var(--accent);
+    }
+
+    .cal-dot.leave { background: var(--leave); }
+    .cal-dot.overtime { background: var(--accent-text); box-shadow: 0 0 0 2px var(--bg-elev); }
+
+    .cal-day.leave { color: var(--leave); }
+    .cal-day.leave.selected { background: var(--leave); color: #fff; }
+
+    /* ============ ENTRY LIST (detail) ============ */
+    .entry-detail {
+      padding: 12px 14px;
+      background: var(--bg-elev-2);
+      border-radius: var(--radius-sm);
+      margin-top: 12px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .entry-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .entry-detail-row .k { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .entry-detail-row .v { font-family: var(--font-mono); font-weight: 500; }
+
+    .btn-delete {
+      margin-top: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--danger);
+      padding: 8px 12px;
+      border-radius: var(--radius-xs);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    .btn-delete:active { background: var(--bg-elev); }
+
+    /* ============ MISC ============ */
+    .hidden { display: none !important; }
+
+    footer {
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 11px;
+      margin-top: 32px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* Reset buttons */
+    button { font-family: inherit; }
+
+    /* Tabular numbers for time displays */
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(24px + env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(20px);
+      background: var(--text);
+      color: var(--bg);
+      padding: 10px 18px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ============ TOP LOADING BAR ============ */
+    .top-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--bg-elev-2);
+      z-index: 90;
+      pointer-events: none;
+    }
+
+    .top-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-text) 100%);
+      transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+      box-shadow: 0 0 8px rgba(232, 160, 70, 0.5);
+    }
+
+    .top-progress-fill.complete {
+      background: linear-gradient(90deg, var(--success) 0%, var(--accent-text) 100%);
+    }
+
+    .top-progress-fill.overtime {
+      background: linear-gradient(90deg, var(--accent-text) 0%, var(--accent) 50%, var(--accent-text) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 2.5s linear infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 0% 0; }
+      100% { background-position: 200% 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-progress">
+    <div class="top-progress-fill" id="topProgressFill"></div>
+  </div>
+
+  <header>
+    <div class="brand">
+      <h1>Heures sup.</h1>
+      <div class="subtitle">Suivi hebdomadaire</div>
+    </div>
+    <div class="header-actions">
+      <button id="installBtn" class="icon-btn" title="Installer">
+        <span>⬇</span> <span>Installer</span>
+      </button>
+      <button id="themeToggle" class="icon-btn" title="Changer le thème" aria-label="Changer de thème">
+        <span id="themeIcon">☾</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- DATE NAVIGATION -->
+  <div class="date-nav">
+    <button class="nav-btn" id="prevDay" aria-label="Jour précédent">‹</button>
+    <div class="date-display" id="dateDisplay">
+      <div>
+        <div class="date-day" id="dateDayText">aujourd'hui</div>
+        <div class="date-full" id="dateFullText">—</div>
+      </div>
+      <input type="date" id="dateInput" />
+    </div>
+    <button class="nav-btn" id="nextDay" aria-label="Jour suivant">›</button>
+  </div>
+
+  <!-- ENTRY CARD -->
+  <div class="card">
+    <div class="type-toggle">
+      <button id="typeWork" class="active" data-type="work">Travail</button>
+      <button id="typeLeave" data-type="leave">Congé</button>
+    </div>
+
+    <!-- WORK FIELDS -->
+    <div id="workFields">
+      <div class="field-grid">
+        <div class="field">
+          <label for="startTime">Début</label>
+          <input type="time" id="startTime" value="08:00" />
+        </div>
+        <div class="field">
+          <label for="endTime">Fin</label>
+          <input type="time" id="endTime" value="16:30" />
+        </div>
+      </div>
+      <div class="full-field">
+        <label for="mealSelect">Repas</label>
+        <select id="mealSelect">
+          <option value="0">Aucun</option>
+          <option value="30">30 minutes</option>
+          <option value="60" selected>60 minutes</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- LEAVE FIELDS -->
+    <div id="leaveFields" class="hidden">
+      <div class="full-field">
+        <label for="leaveSelect">Type de congé</label>
+        <select id="leaveSelect">
+          <option value="personal">Congé personnel</option>
+          <option value="birthday">Journée anniversaire</option>
+          <option value="vacation">Journée vacances</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="full-field">
+      <label for="noteInput">Note</label>
+      <textarea id="noteInput" placeholder="Raison du temps supplémentaire…"></textarea>
+    </div>
+
+    <div class="day-summary">
+      <div>
+        <span class="save-pulse" id="savePulse"></span>
+        <span class="day-summary-label">Heures de la journée</span>
+      </div>
+      <div>
+        <span class="day-summary-value mono" id="dayHoursValue">0,00</span>
+        <span id="overtimeBadge" class="overtime-badge hidden">Sup.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS CARD -->
+  <div class="card progress-card">
+    <div class="progress-head">
+      <div>
+        <div class="card-label">Progression</div>
+        <div class="progress-value mono">
+          <span id="weekHours">0,00</span>
+          <span class="sep">/</span>
+          <span class="target">37,5</span>
+        </div>
+      </div>
+      <div class="week-range" id="weekRange">—</div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-fill" id="barFill" style="width: 0%"></div>
+    </div>
+    <div class="progress-legend">
+      <span id="progressPct">0 %</span>
+      <span id="overtimeHours"></span>
+    </div>
+  </div>
+
+  <!-- CALENDAR CARD -->
+  <div class="card">
+    <div class="cal-head">
+      <div class="cal-month mono" id="calMonth">—</div>
+      <div class="cal-nav">
+        <button id="calPrev" aria-label="Mois précédent">‹</button>
+        <button id="calToday" aria-label="Aujourd'hui" style="width:auto; padding:0 10px; border-radius:16px; font-size:11px;">Auj.</button>
+        <button id="calNext" aria-label="Mois suivant">›</button>
+      </div>
+    </div>
+    <div class="cal-weekdays">
+      <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <footer>Données stockées localement</footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ============ STATE ============
+    const STORAGE_KEY = 'heuressup.v1';
+    const SETTINGS_KEY = 'heuressup.settings.v1';
+    const WEEKLY_TARGET = 37.5;
+    const DAILY_STANDARD = 7.5;
+
+    const LEAVE_LABELS = {
+      personal: 'Congé personnel',
+      birthday: 'Journée anniversaire',
+      vacation: 'Journée vacances'
+    };
+
+    const state = {
+      entries: {},
+      currentDate: new Date(),
+      calMonth: new Date(),
+      settings: { theme: 'dark' }
+    };
+
+    // ============ PERSISTENCE ============
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) state.entries = JSON.parse(raw);
+      } catch(e) { state.entries = {}; }
+      try {
+        const s = localStorage.getItem(SETTINGS_KEY);
+        if (s) Object.assign(state.settings, JSON.parse(s));
+      } catch(e) {}
+    }
+
+    function saveEntries() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+    }
+
+    function saveSettings() {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    }
+
+    // ============ DATE UTILITIES ============
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function dateKey(d) {
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+
+    function parseKey(k) {
+      const [y, m, d] = k.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function getWeekStart(date) {
+      const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
+
+    function isSameDay(a, b) {
+      return dateKey(a) === dateKey(b);
+    }
+
+    const weekdayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+    const monthNames = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+
+    function formatDayText(d) {
+      const today = new Date();
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      if (isSameDay(d, today)) return "aujourd'hui";
+      if (isSameDay(d, yesterday)) return 'hier';
+      if (isSameDay(d, tomorrow)) return 'demain';
+      return weekdayNames[d.getDay()];
+    }
+
+    function formatFullDate(d) {
+      return d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
+    }
+
+    function formatHours(h) {
+      return h.toFixed(2).replace('.', ',');
+    }
+
+    // ============ CALCULATIONS ============
+    function calcEntryHours(entry) {
+      if (!entry) return 0;
+      if (entry.type === 'leave') return DAILY_STANDARD;
+      if (!entry.start || !entry.end) return 0;
+      const [sh, sm] = entry.start.split(':').map(Number);
+      const [eh, em] = entry.end.split(':').map(Number);
+      let mins = (eh * 60 + em) - (sh * 60 + sm);
+      if (mins < 0) mins += 24 * 60;
+      mins -= (entry.meal || 0);
+      return Math.max(0, mins / 60);
+    }
+
+    function getWeekTotal(date) {
+      const start = getWeekStart(date);
+      let total = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start); d.setDate(d.getDate() + i);
+        const e = state.entries[dateKey(d)];
+        if (e) total += calcEntryHours(e);
+      }
+      return total;
+    }
+
+    // ============ DOM ============
+    const $ = (id) => document.getElementById(id);
+    const dateInput = $('dateInput');
+    const dateDayText = $('dateDayText');
+    const dateFullText = $('dateFullText');
+    const typeWork = $('typeWork');
+    const typeLeave = $('typeLeave');
+    const workFields = $('workFields');
+    const leaveFields = $('leaveFields');
+    const startTime = $('startTime');
+    const endTime = $('endTime');
+    const mealSelect = $('mealSelect');
+    const leaveSelect = $('leaveSelect');
+    const noteInput = $('noteInput');
+    const dayHoursValue = $('dayHoursValue');
+    const overtimeBadge = $('overtimeBadge');
+    const savePulse = $('savePulse');
+    const weekHours = $('weekHours');
+    const weekRange = $('weekRange');
+    const barFill = $('barFill');
+    const progressPct = $('progressPct');
+    const overtimeHours = $('overtimeHours');
+    const calGrid = $('calGrid');
+    const calMonth = $('calMonth');
+    const themeToggle = $('themeToggle');
+    const themeIcon = $('themeIcon');
+    const themeColorMeta = $('themeColorMeta');
+    const installBtn = $('installBtn');
+    const toast = $('toast');
+    const topProgressFill = $('topProgressFill');
+
+    // ============ RENDERING ============
+    function renderDateDisplay() {
+      dateInput.value = dateKey(state.currentDate);
+      dateDayText.textContent = formatDayText(state.currentDate);
+      dateFullText.textContent = formatFullDate(state.currentDate);
+    }
+
+    function renderForm() {
+      const key = dateKey(state.currentDate);
+      const entry = state.entries[key];
+      if (entry && entry.type === 'leave') {
+        typeLeave.classList.add('active');
+        typeWork.classList.remove('active');
+        workFields.classList.add('hidden');
+        leaveFields.classList.remove('hidden');
+        leaveSelect.value = entry.leaveType || 'personal';
+        noteInput.value = entry.note || '';
+      } else {
+        typeWork.classList.add('active');
+        typeLeave.classList.remove('active');
+        workFields.classList.remove('hidden');
+        leaveFields.classList.add('hidden');
+        startTime.value = (entry && entry.start) || '08:00';
+        endTime.value = (entry && entry.end) || '16:30';
+        mealSelect.value = entry ? String(entry.meal) : '60';
+        noteInput.value = (entry && entry.note) || '';
+      }
+      renderDaySummary();
+    }
+
+    function renderDaySummary() {
+      const key = dateKey(state.currentDate);
+      const entry = state.entries[key];
+      const h = calcEntryHours(entry);
+      dayHoursValue.textContent = formatHours(h);
+      if (h > DAILY_STANDARD && entry && entry.type !== 'leave') {
+        overtimeBadge.classList.remove('hidden');
+        overtimeBadge.textContent = '+' + formatHours(h - DAILY_STANDARD) + ' h';
+      } else {
+        overtimeBadge.classList.add('hidden');
+      }
+    }
+
+    function renderProgress() {
+      const total = getWeekTotal(state.currentDate);
+      const ws = getWeekStart(state.currentDate);
+      const we = new Date(ws); we.setDate(we.getDate() + 6);
+      weekHours.textContent = formatHours(total);
+      weekRange.textContent = ws.getDate() + ' ' + monthNames[ws.getMonth()].slice(0,3) + '. – ' + we.getDate() + ' ' + monthNames[we.getMonth()].slice(0,3) + '.';
+
+      const pct = Math.min(100, (total / WEEKLY_TARGET) * 100);
+      barFill.style.width = pct + '%';
+      progressPct.textContent = Math.round(pct) + ' %';
+
+      if (total > WEEKLY_TARGET) {
+        barFill.classList.add('overtime');
+        overtimeHours.textContent = '+' + formatHours(total - WEEKLY_TARGET) + ' h sup.';
+      } else {
+        barFill.classList.remove('overtime');
+        overtimeHours.textContent = formatHours(WEEKLY_TARGET - total) + ' h restantes';
+      }
+
+      // Top loading-bar style progress
+      const topPct = Math.min(100, (total / WEEKLY_TARGET) * 100);
+      topProgressFill.style.width = topPct + '%';
+      topProgressFill.classList.toggle('complete', total >= WEEKLY_TARGET && total <= WEEKLY_TARGET + 0.001);
+      topProgressFill.classList.toggle('overtime', total > WEEKLY_TARGET);
+    }
+
+    function renderCalendar() {
+      const year = state.calMonth.getFullYear();
+      const month = state.calMonth.getMonth();
+      calMonth.textContent = monthNames[month] + ' ' + year;
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startOffset = (firstDay.getDay() + 6) % 7; // Mon=0
+
+      calGrid.innerHTML = '';
+
+      // previous month padding days
+      for (let i = 0; i < startOffset; i++) {
+        const d = new Date(year, month, -startOffset + i + 1);
+        calGrid.appendChild(makeCalDay(d, true));
+      }
+      for (let d = 1; d <= lastDay.getDate(); d++) {
+        calGrid.appendChild(makeCalDay(new Date(year, month, d), false));
+      }
+      // fill to complete rows
+      const totalCells = calGrid.children.length;
+      const remainder = totalCells % 7;
+      if (remainder !== 0) {
+        for (let i = 1; i <= 7 - remainder; i++) {
+          calGrid.appendChild(makeCalDay(new Date(year, month + 1, i), true));
+        }
+      }
+    }
+
+    function makeCalDay(d, otherMonth) {
+      const btn = document.createElement('button');
+      btn.className = 'cal-day';
+      if (otherMonth) btn.classList.add('other-month');
+      const key = dateKey(d);
+      const entry = state.entries[key];
+      const today = new Date();
+
+      const num = document.createElement('div');
+      num.className = 'cal-day-num';
+      num.textContent = d.getDate();
+      btn.appendChild(num);
+
+      if (entry) {
+        btn.classList.add('has-entry');
+        const dot = document.createElement('div');
+        dot.className = 'cal-dot';
+        if (entry.type === 'leave') {
+          btn.classList.add('leave');
+          dot.classList.add('leave');
+        } else if (calcEntryHours(entry) > DAILY_STANDARD) {
+          dot.classList.add('overtime');
+        }
+        btn.appendChild(dot);
+      }
+
+      if (isSameDay(d, today)) btn.classList.add('today');
+      if (isSameDay(d, state.currentDate)) btn.classList.add('selected');
+
+      btn.addEventListener('click', () => {
+        state.currentDate = d;
+        state.calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+        renderAll();
+      });
+
+      return btn;
+    }
+
+    function renderTheme() {
+      document.documentElement.setAttribute('data-theme', state.settings.theme);
+      themeIcon.textContent = state.settings.theme === 'dark' ? '☾' : '☀';
+      themeColorMeta.setAttribute('content', state.settings.theme === 'dark' ? '#0f0e0d' : '#faf8f3');
+    }
+
+    function renderAll() {
+      renderDateDisplay();
+      renderForm();
+      renderProgress();
+      renderCalendar();
+    }
+
+    // ============ ACTIONS ============
+    function pulseSave() {
+      savePulse.classList.remove('visible');
+      void savePulse.offsetWidth;
+      savePulse.classList.add('visible');
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    function autoSave() {
+      const key = dateKey(state.currentDate);
+      const isLeave = typeLeave.classList.contains('active');
+      const note = noteInput.value.trim();
+
+      if (isLeave) {
+        state.entries[key] = {
+          type: 'leave',
+          leaveType: leaveSelect.value,
+          note
+        };
+      } else {
+        // Only save if times are set
+        if (!startTime.value || !endTime.value) {
+          // incomplete — don't persist yet
+          renderDaySummary();
+          renderProgress();
+          return;
+        }
+        state.entries[key] = {
+          type: 'work',
+          start: startTime.value,
+          end: endTime.value,
+          meal: parseInt(mealSelect.value, 10),
+          note
+        };
+      }
+      saveEntries();
+      renderDaySummary();
+      renderProgress();
+      renderCalendar();
+      pulseSave();
+    }
+
+    function deleteEntry() {
+      const key = dateKey(state.currentDate);
+      if (state.entries[key]) {
+        delete state.entries[key];
+        saveEntries();
+        renderAll();
+        showToast('Entrée supprimée');
+      }
+    }
+
+    function shiftDay(n) {
+      const d = new Date(state.currentDate);
+      d.setDate(d.getDate() + n);
+      state.currentDate = d;
+      state.calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+      renderAll();
+    }
+
+    function shiftMonth(n) {
+      state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth() + n, 1);
+      renderCalendar();
+    }
+
+    // ============ EVENT WIRING ============
+    dateInput.addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      state.currentDate = parseKey(e.target.value);
+      state.calMonth = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), 1);
+      renderAll();
+    });
+
+    $('prevDay').addEventListener('click', () => shiftDay(-1));
+    $('nextDay').addEventListener('click', () => shiftDay(1));
+    $('calPrev').addEventListener('click', () => shiftMonth(-1));
+    $('calNext').addEventListener('click', () => shiftMonth(1));
+    $('calToday').addEventListener('click', () => {
+      state.currentDate = new Date();
+      state.calMonth = new Date();
+      renderAll();
+    });
+
+    typeWork.addEventListener('click', () => {
+      typeWork.classList.add('active');
+      typeLeave.classList.remove('active');
+      workFields.classList.remove('hidden');
+      leaveFields.classList.add('hidden');
+      autoSave();
+    });
+
+    typeLeave.addEventListener('click', () => {
+      typeLeave.classList.add('active');
+      typeWork.classList.remove('active');
+      workFields.classList.add('hidden');
+      leaveFields.classList.remove('hidden');
+      autoSave();
+    });
+
+    // Auto-save on any change (requirement #6)
+    [startTime, endTime, mealSelect, leaveSelect].forEach(el => {
+      el.addEventListener('change', autoSave);
+      el.addEventListener('input', autoSave);
+      el.addEventListener('blur', autoSave);
+    });
+
+    // For note, debounce to avoid writing on every keystroke
+    let noteTimer;
+    noteInput.addEventListener('input', () => {
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(autoSave, 400);
+    });
+    noteInput.addEventListener('blur', () => {
+      clearTimeout(noteTimer);
+      autoSave();
+    });
+
+    // Theme toggle
+    themeToggle.addEventListener('click', () => {
+      state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+      saveSettings();
+      renderTheme();
+    });
+
+    // PWA install prompt
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.classList.add('show');
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        showToast('Utilisez le menu du navigateur pour installer');
+        return;
+      }
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.classList.remove('show');
+      if (outcome === 'accepted') showToast('Application installée');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installBtn.classList.remove('show');
+      deferredPrompt = null;
+    });
+
+    // Long-press on a calendar day with entry to delete? Keep it simple: clicking selected day again when empty-ish does nothing.
+    // Instead: add double-click on selected day to delete.
+    // Better: add delete via long-press on selected day. Skip — user can just clear fields.
+
+    // Service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+      });
+    }
+
+    // ============ INIT ============
+    loadState();
+    renderTheme();
+    state.calMonth = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth(), 1);
+    renderAll();
+  </script>
+</body>
+</html>
