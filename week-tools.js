@@ -135,15 +135,6 @@
     deleteKeys(weekKeys(), 'Heures de la semaine');
   }
 
-  function rowDateKey(wrap) {
-    const list = document.querySelector('.week-list');
-    if (!list) return null;
-    const rows = Array.from(list.querySelectorAll(':scope > .week-row-swipe-wrap'));
-    const index = rows.indexOf(wrap);
-    if (index < 0) return null;
-    return weekKeys()[index] || null;
-  }
-
   function resetRow(wrap) {
     if (!wrap) return;
     wrap.classList.remove('revealed', 'deleting');
@@ -161,16 +152,6 @@
     document.querySelectorAll('.week-row-swipe-wrap.revealed').forEach(wrap => {
       if (wrap !== except) resetRow(wrap);
     });
-  }
-
-  function deleteRow(wrap) {
-    const key = rowDateKey(wrap);
-    if (!key) return;
-    wrap.classList.add('deleting');
-    setTimeout(() => {
-      deleteKeys([key], 'Ligne');
-      resetRow(wrap);
-    }, 210);
   }
 
   function ensureRowSwipeStructure() {
@@ -215,13 +196,9 @@
 
   function bindDelete() {
     document.addEventListener('click', e => {
-      const rowDelete = e.target.closest('[data-delete-row-swipe]');
-      if (rowDelete) {
-        e.preventDefault();
-        const wrap = rowDelete.closest('.week-row-swipe-wrap');
-        deleteRow(wrap);
-        return;
-      }
+      // Important: la suppression de ligne est gérée par week-native-delete.js.
+      // Ici, on laisse passer le clic pour éviter de bloquer le vrai bouton natif “Effacer cette journée”.
+      if (e.target.closest('[data-delete-row-swipe]')) return;
 
       const btn = e.target.closest('#deleteCurrentWeekBtn');
       if (!btn) return;
