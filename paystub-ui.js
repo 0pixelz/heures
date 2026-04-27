@@ -3,6 +3,7 @@
 (() => {
   const REGULAR_PAY_LIMIT = 40;
   const MAX_VALID_DEDUCTION_RATE = 0.75;
+  const METRO_DEFAULT_DEDUCTION_RATE = 543.34 / 1619.53;
   const $ = (id) => document.getElementById(id);
   const money = (v) => v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' });
   const hrs = (v) => Number(v || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' h';
@@ -57,7 +58,10 @@
   function deductionRate(p){
     const saved = validRate(localStorage.getItem('payrollDeductionRate'));
     if (saved) return saved;
-    return inferredDeductionRate(p);
+    const inferred = inferredDeductionRate(p);
+    if (inferred) return inferred;
+    const hasPayInfo = Number(localStorage.getItem('payrollHourlyRate') || 0) > 0 || !!p.importedAt || !!p.hourlyRate;
+    return hasPayInfo ? METRO_DEFAULT_DEDUCTION_RATE : 0;
   }
   function repairInvalidRates(){
     const saved = Number(localStorage.getItem('payrollDeductionRate') || 0);
@@ -133,8 +137,8 @@
     if(del&&!del.dataset.bound){ del.dataset.bound=1; del.onclick=deleteImportedPaystub; }
     if(mh&&!mh.dataset.bound){ mh.dataset.bound=1; mh.value=localStorage.getItem('manualEstimateHours')||''; mh.oninput=()=>{ localStorage.setItem('manualEstimateHours', mh.value || ''); renderManualEstimate(); }; }
     if(r&&!r.dataset.bound){ r.dataset.bound=1; r.value=localStorage.getItem('payrollHourlyRate')||''; r.oninput=()=>{ if(Number(r.value)>0)localStorage.setItem('payrollHourlyRate',r.value); render(); }; }
-    if(d&&!d.dataset.bound){ d.dataset.bound=1; const sv=validRate(localStorage.getItem('payrollDeductionRate')); d.value=sv?String(sv*100):''; d.oninput=()=>{ const val=Number(d.value || 0); if(val>0 && val<75)localStorage.setItem('payrollDeductionRate',String(val/100)); render(); }; }
-    if(pdf&&!pdf.dataset.bound){ pdf.dataset.bound=1; pdf.onchange=async(e)=>{ const file=e.target.files?.[0]; if(!file)return; const status=$('paystubImportStatus'); try{ status.textContent='Analyse du PDF en cours…'; if(!window.PaystubPDF)throw new Error('PDF module absent'); const a=await window.PaystubPDF.analyzeFile(file); window.PaystubPDF.saveProfileFromAnalysis(a); const inferred = inferredDeductionRate(a); if(inferred)localStorage.setItem('payrollDeductionRate',String(inferred)); if(a.hourlyRate)localStorage.setItem('payrollHourlyRate',String(a.hourlyRate)); else if(a.grossPay&&a.regularHours)localStorage.setItem('payrollHourlyRate',String(a.grossPay/a.regularHours)); status.textContent=`PDF analysé. Brut: ${money(a.grossPay)} | Net: ${money(a.netPay)} | Retenues: ${pct(inferred || a.deductionRate)}`; if(r) r.value=localStorage.getItem('payrollHourlyRate')||''; if(d){ const sv=validRate(localStorage.getItem('payrollDeductionRate')); d.value=sv?String(sv*100):''; } render(); }catch(err){ status.textContent='Impossible de lire ce PDF. Vérifie qu’il contient du texte sélectionnable.'; console.error(err); } finally { pdf.value=''; } }; }
+    if(d&&!d.dataset.bound){ d.dataset.bound=1; const sv=validRate(localStorage.getItem('payrollDeductionRate')) || METRO_DEFAULT_DEDUCTION_RATE; d.value=sv?String(sv*100):''; d.oninput=()=>{ const val=Number(d.value || 0); if(val>0 && val<75)localStorage.setItem('payrollDeductionRate',String(val/100)); render(); }; }
+    if(pdf&&!pdf.dataset.bound){ pdf.dataset.bound=1; pdf.onchange=async(e)=>{ const file=e.target.files?.[0]; if(!file)return; const status=$('paystubImportStatus'); try{ status.textContent='Analyse du PDF en cours…'; if(!window.PaystubPDF)throw new Error('PDF module absent'); const a=await window.PaystubPDF.analyzeFile(file); window.PaystubPDF.saveProfileFromAnalysis(a); const inferred = inferredDeductionRate(a) || METRO_DEFAULT_DEDUCTION_RATE; if(inferred)localStorage.setItem('payrollDeductionRate',String(inferred)); if(a.hourlyRate)localStorage.setItem('payrollHourlyRate',String(a.hourlyRate)); else if(a.grossPay&&a.regularHours)localStorage.setItem('payrollHourlyRate',String(a.grossPay/a.regularHours)); status.textContent=`PDF analysé. Brut: ${money(a.grossPay)} | Net: ${money(a.netPay)} | Retenues: ${pct(inferred || a.deductionRate)}`; if(r) r.value=localStorage.getItem('payrollHourlyRate')||''; if(d){ const sv=validRate(localStorage.getItem('payrollDeductionRate')) || METRO_DEFAULT_DEDUCTION_RATE; d.value=sv?String(sv*100):''; } render(); }catch(err){ status.textContent='Impossible de lire ce PDF. Vérifie qu’il contient du texte sélectionnable.'; console.error(err); } finally { pdf.value=''; } }; }
   }
   function init(){ if(window.__payrollFixed)return; window.__payrollFixed=true; styles(); view(); nav(); bind(); render(); }
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
