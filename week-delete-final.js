@@ -1,11 +1,12 @@
 // week-delete-final.js
-// Override final: un seul handler pour supprimer une ligne swipée.
+// Override final: suppression sans gel après swipe.
 (() => {
   if (window.__weekDeleteFinalLoaded) return;
   window.__weekDeleteFinalLoaded = true;
 
   const DELETED_KEY = 'deletedWeekDatesV2';
   const MONTHS = { janv:0, fevr:1, fevrier:1, mars:2, avr:3, avril:3, mai:4, juin:5, juil:6, aout:7, sept:8, oct:9, novembre:10, nov:10, dec:11, decembre:11 };
+  let deleting = false;
 
   const norm = v => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').trim();
   const pad = n => String(n).padStart(2, '0');
@@ -50,14 +51,7 @@
 
   function allFormats(key) {
     const [y, m, d] = key.split('-');
-    return [
-      key,
-      `${y}/${m}/${d}`,
-      `${y}${m}${d}`,
-      `${Number(d)}/${Number(m)}/${y}`,
-      `${d}/${m}/${y}`,
-      `${y}-${Number(m)}-${Number(d)}`
-    ].map(norm);
+    return [key, `${y}/${m}/${d}`, `${y}${m}${d}`, `${Number(d)}/${Number(m)}/${y}`, `${d}/${m}/${y}`, `${y}-${Number(m)}-${Number(d)}`].map(norm);
   }
 
   function matches(value, key) {
@@ -68,18 +62,13 @@
 
   function cleanAny(value, key, depth = 0) {
     if (value == null || depth > 12) return { value, changed:false, removed:0 };
-
-    if (typeof value !== 'object') {
-      return { value, changed:false, removed:0 };
-    }
+    if (typeof value !== 'object') return { value, changed:false, removed:0 };
 
     if (Array.isArray(value)) {
       let changed = false, removed = 0;
       const next = [];
       for (const item of value) {
-        if (matches(JSON.stringify(item), key)) {
-          changed = true; removed++; continue;
-        }
+        if (matches(JSON.stringify(item), key)) { changed = true; removed++; continue; }
         const r = cleanAny(item, key, depth + 1);
         changed = changed || r.changed;
         removed += r.removed;
@@ -90,26 +79,15 @@
 
     const out = { ...value };
     let changed = false, removed = 0;
-
     for (const prop of Object.keys(out)) {
-      if (matches(prop, key)) {
-        delete out[prop]; changed = true; removed++; continue;
-      }
-
+      if (matches(prop, key)) { delete out[prop]; changed = true; removed++; continue; }
       const child = out[prop];
       if (child && typeof child === 'object') {
-        if (matches(JSON.stringify(child), key)) {
-          delete out[prop]; changed = true; removed++; continue;
-        }
+        if (matches(JSON.stringify(child), key)) { delete out[prop]; changed = true; removed++; continue; }
         const r = cleanAny(child, key, depth + 1);
-        if (r.changed) {
-          out[prop] = r.value;
-          changed = true;
-          removed += r.removed;
-        }
+        if (r.changed) { out[prop] = r.value; changed = true; removed += r.removed; }
       }
     }
-
     return { value: out, changed, removed };
   }
 
@@ -149,7 +127,6 @@
         }
       }
     }
-
     return { removed, changedKeys };
   }
 
@@ -189,27 +166,37 @@
     }
     el.textContent = message;
     el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 1800);
+    setTimeout(() => el.classList.remove('show'), 1600);
   }
 
   function deleteRow(btn) {
+    if (deleting) return;
+    deleting = true;
+
     const wrap = btn.closest('.week-row-swipe-wrap');
     const d = rowToDate(wrap);
-    if (!d) { toast('Date introuvable'); return; }
+    if (!d) {
+      deleting = false;
+      toast('Date introuvable');
+      return;
+    }
     const key = dateKey(d);
 
     const deleted = readDeleted();
     deleted.add(key);
     writeDeleted(deleted);
 
-    const result = cleanLocalStorage(key);
-    localStorage.setItem('weekDeleteFinalLastRun', JSON.stringify({ key, result, at: new Date().toISOString() }));
-
     clearRowVisual(wrap);
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('hours-data-updated', { detail: { key, result } }));
-    toast('Journée supprimée');
-    setTimeout(() => location.reload(), 450);
+
+    setTimeout(() => {
+      const result = cleanLocalStorage(key);
+      localStorage.setItem('weekDeleteFinalLastRun', JSON.stringify({ key, result, at: new Date().toISOString() }));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('hours-data-updated', { detail: { key, result } }));
+      clearTombstonedRows();
+      toast('Journée supprimée');
+      setTimeout(() => { deleting = false; }, 500);
+    }, 30);
   }
 
   function handleDeleteEvent(e) {
@@ -221,16 +208,14 @@
     deleteRow(btn);
   }
 
-  // Pointer/touch are used because mobile Chrome sometimes delays/cancels click after swipe.
-  window.addEventListener('pointerup', handleDeleteEvent, true);
-  window.addEventListener('touchend', handleDeleteEvent, true);
+  // Click only: avoids mobile double execution/freeze caused by pointerup + touchend + click.
   window.addEventListener('click', handleDeleteEvent, true);
 
   const observer = new MutationObserver(clearTombstonedRows);
   function start() {
     clearTombstonedRows();
     observer.observe(document.body, { childList:true, subtree:true });
-    setInterval(clearTombstonedRows, 800);
+    setInterval(clearTombstonedRows, 1200);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
