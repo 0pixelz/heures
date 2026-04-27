@@ -4,10 +4,9 @@
   const REGULAR_PAY_LIMIT = 40;
   const DEFAULT_HOURLY_RATE = 39.743;
   const MAX_VALID_DEDUCTION_RATE = 0.75;
+  const WEEK_OFFSET_KEY = 'payrollWeekOffset';
 
   // Metro reference paystubs supplied by Jonathan.
-  // 37.5 h: gross 1490.36, deductions 486.85, net 1003.51
-  // 40.5 h: gross 1619.53, deductions 543.34, net 1076.19
   const REF_NORMAL = { hours: 37.5, gross: 1490.36, deductions: 486.85, net: 1003.51 };
   const REF_OT = { hours: 40.5, gross: 1619.53, deductions: 543.34, net: 1076.19 };
   const NORMAL_DEDUCTION_RATE = REF_NORMAL.deductions / REF_NORMAL.gross;
@@ -22,6 +21,8 @@
   function readJson(key) { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; } }
   function validRate(v) { const n = Number(v); return Number.isFinite(n) && n > 0 && n < MAX_VALID_DEDUCTION_RATE ? n : 0; }
   function profile(){ return readJson('paystubProfile'); }
+  function getWeekOffset(){ const n=Number(localStorage.getItem(WEEK_OFFSET_KEY)||0); return Number.isFinite(n)?n:0; }
+  function setWeekOffset(value){ localStorage.setItem(WEEK_OFFSET_KEY, String(value)); render(); }
 
   function entries() {
     for (const k of ['heuressup.v1', 'heuresData', 'entries', 'timeEntries']) {
@@ -33,8 +34,14 @@
 
   function dkey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
-  function weekStart(){ const d=new Date(); d.setHours(0,0,0,0); const day=d.getDay(); d.setDate(d.getDate()+(day===0?-6:1-day)); return d; }
+  function weekStart(){
+    const d=new Date(); d.setHours(0,0,0,0);
+    const day=d.getDay(); d.setDate(d.getDate()+(day===0?-6:1-day));
+    d.setDate(d.getDate() + getWeekOffset()*7);
+    return d;
+  }
   function fmt(d){ return d.toLocaleDateString('fr-CA',{day:'numeric',month:'long',year:'numeric'}); }
+  function weekLabel(offset){ if(offset===0) return 'Cette semaine'; if(offset===-1) return 'Semaine dernière'; if(offset===1) return 'Semaine prochaine'; return offset<0 ? `${Math.abs(offset)} semaines avant` : `${offset} semaines après`; }
 
   function entryHours(e){
     if (!e || e.type === 'leave') return 0;
@@ -57,15 +64,13 @@
   function summary(){
     const e=entries(), start=weekStart(), end=addDays(start,6); let worked=0;
     for(let i=0;i<7;i++) worked += entryHours(e[dkey(addDays(start,i))]);
-    return { start,end,...splitHours(worked) };
+    return { start,end,offset:getWeekOffset(),...splitHours(worked) };
   }
 
   function inferredDeductionRate(p){
     const direct = validRate(p.deductionRate);
     if (direct) return direct;
-    const gross = Number(p.grossPay || 0);
-    const deductions = Number(p.deductions || 0);
-    const net = Number(p.netPay || 0);
+    const gross = Number(p.grossPay || 0), deductions = Number(p.deductions || 0), net = Number(p.netPay || 0);
     if (gross > 0 && deductions > 0) return validRate(deductions / gross);
     if (gross > 0 && net > 0 && gross > net) return validRate((gross - net) / gross);
     return 0;
@@ -86,13 +91,10 @@
   }
 
   function metroDeductionEstimate(hoursValue, gross){
-    const h = Number(hoursValue || 0);
-    const g = Number(gross || 0);
+    const h = Number(hoursValue || 0), g = Number(gross || 0);
     if (!g) return null;
-
     if (Math.abs(h - REF_NORMAL.hours) < 0.01) return REF_NORMAL.deductions;
     if (Math.abs(h - REF_OT.hours) < 0.01) return REF_OT.deductions;
-
     if (h <= REF_NORMAL.hours) return g * NORMAL_DEDUCTION_RATE;
     if (h <= REF_OT.hours) return REF_NORMAL.deductions + Math.max(0, g - REF_NORMAL.gross) * MARGINAL_DEDUCTION_RATE;
     return REF_OT.deductions + Math.max(0, g - REF_OT.gross) * OT_DEDUCTION_RATE;
@@ -101,17 +103,15 @@
   function estimateFromHours(totalHours){
     const p=profile(), r=hourlyRate(p), s=splitHours(totalHours);
     const gross = r>0 ? s.regular*r + s.overtime*r*1.5 : null;
-
     const manualRate = manualDeductionRate();
     const profileRate = inferredDeductionRate(p);
     const rateToShow = manualRate || profileRate || (gross ? metroDeductionEstimate(s.worked, gross) / gross : 0);
     const ded = gross != null ? (manualRate ? gross * manualRate : metroDeductionEstimate(s.worked, gross)) : null;
     const net = gross != null && ded != null ? gross - ded : null;
-
     return {s,p,r,dr:rateToShow,gross,ded,net};
   }
 
-  function estimate(){ const base=estimateFromHours(summary().worked); base.s={...summary(),...base.s}; return base; }
+  function estimate(){ const s=summary(); const base=estimateFromHours(s.worked); base.s={...s,...base.s}; return base; }
 
   function deleteImportedPaystub(){
     localStorage.removeItem('paystubProfile');
@@ -128,14 +128,14 @@
   function styles(){
     if ($('payrollStyles')) return;
     const s=document.createElement('style'); s.id='payrollStyles';
-    s.textContent = `#payrollView{display:none}#payrollView.show{display:block}.payroll-hidden{display:none!important}.payroll-title{font-family:var(--font-display);font-style:italic;font-size:34px;line-height:1}.payroll-sub{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin:8px 0 18px}.payroll-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}.payroll-card{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:16px}.payroll-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin-bottom:8px}.payroll-value{font-family:var(--font-display);font-style:italic;font-size:32px;color:var(--accent-text);line-height:1}.payroll-note{font-size:12px;color:var(--text-dim);margin-top:8px}.payroll-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px dashed var(--border)}.payroll-row:last-child{border-bottom:0}.payroll-row span{color:var(--text-dim);font-size:13px}.payroll-row strong{font-family:var(--font-mono);font-size:14px;text-align:right}.payroll-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.payroll-inputs input{width:100%;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-family:var(--font-mono)}.payroll-import{display:block;width:100%;padding:14px;border:1px dashed var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-elev-2);color:var(--text);text-align:center;cursor:pointer}.payroll-link{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;padding:13px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--accent-soft);color:var(--accent-text);text-decoration:none;font-size:13px;font-weight:600}.payroll-link:active{transform:scale(.99)}.manual-estimate-card{border-color:var(--accent);background:linear-gradient(180deg,var(--bg-elev),var(--bg-elev-2))}.manual-estimate-results{margin-top:14px}.payroll-profile-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.payroll-delete-btn{border:1px solid rgba(229,107,107,.45);background:rgba(229,107,107,.08);color:var(--danger);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}.payroll-delete-btn:active{transform:scale(.97)}@media(max-width:430px){.payroll-grid,.payroll-inputs{grid-template-columns:1fr}.payroll-title{font-size:30px}.payroll-profile-actions{justify-content:flex-start}.payroll-delete-btn{width:100%;border-radius:var(--radius-sm);padding:10px}}`;
+    s.textContent = `#payrollView{display:none}#payrollView.show{display:block}.payroll-hidden{display:none!important}.payroll-title{font-family:var(--font-display);font-style:italic;font-size:34px;line-height:1}.payroll-sub{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin:8px 0 18px}.payroll-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}.payroll-card{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:16px}.payroll-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin-bottom:8px}.payroll-value{font-family:var(--font-display);font-style:italic;font-size:32px;color:var(--accent-text);line-height:1}.payroll-note{font-size:12px;color:var(--text-dim);margin-top:8px}.payroll-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px dashed var(--border)}.payroll-row:last-child{border-bottom:0}.payroll-row span{color:var(--text-dim);font-size:13px}.payroll-row strong{font-family:var(--font-mono);font-size:14px;text-align:right}.payroll-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.payroll-inputs input{width:100%;background:var(--bg-elev-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-family:var(--font-mono)}.payroll-import{display:block;width:100%;padding:14px;border:1px dashed var(--border-strong);border-radius:var(--radius-sm);background:var(--bg-elev-2);color:var(--text);text-align:center;cursor:pointer}.payroll-link{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;padding:13px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--accent-soft);color:var(--accent-text);text-decoration:none;font-size:13px;font-weight:600}.payroll-link:active{transform:scale(.99)}.manual-estimate-card{border-color:var(--accent);background:linear-gradient(180deg,var(--bg-elev),var(--bg-elev-2))}.manual-estimate-results{margin-top:14px}.payroll-profile-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.payroll-delete-btn{border:1px solid rgba(229,107,107,.45);background:rgba(229,107,107,.08);color:var(--danger);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}.payroll-week-nav{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0 14px}.payroll-week-nav button{background:var(--bg-elev-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:10px 8px;font-size:12px;font-weight:700;cursor:pointer}.payroll-week-nav button:active{transform:scale(.98)}.payroll-week-chip{display:inline-flex;margin-bottom:8px;padding:6px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}@media(max-width:430px){.payroll-grid,.payroll-inputs{grid-template-columns:1fr}.payroll-title{font-size:30px}.payroll-profile-actions{justify-content:flex-start}.payroll-delete-btn{width:100%;border-radius:var(--radius-sm);padding:10px}}`;
     document.head.appendChild(s);
   }
 
   function view(){
     if ($('payrollView')) return;
     const v=document.createElement('main'); v.id='payrollView';
-    v.innerHTML = `<div class="payroll-title">Calendrier de paie</div><div class="payroll-sub">Paie hebdomadaire estimée</div><div class="card"><div class="card-label">Semaine de paie</div><div class="payroll-row"><span>Période actuelle</span><strong id="payWeekRange">—</strong></div><div class="payroll-row"><span>Heures travaillées</span><strong id="payWorkedHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.0</span><strong id="payRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.5</span><strong id="payOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Seuil taux 1.5</span><strong>Après 40,00 h</strong></div></div><div class="payroll-grid"><div class="payroll-card"><div class="payroll-label">Brut estimé</div><div class="payroll-value" id="payGross">—</div><div class="payroll-note">40 h max à 1.0, surplus à 1.5</div></div><div class="payroll-card"><div class="payroll-label">Net estimé</div><div class="payroll-value" id="payNet">—</div><div class="payroll-note">après retenues</div></div></div><div class="card manual-estimate-card"><div class="card-label">Estimation manuelle</div><div class="payroll-inputs"><div><label class="payroll-label">Nombre d'heures</label><input id="manualHoursInput" type="number" step="0.25" placeholder="ex. 40.50"></div><div><label class="payroll-label">Net estimé</label><input id="manualNetDisplay" type="text" readonly placeholder="—"></div></div><div class="manual-estimate-results"><div class="payroll-row"><span>Heures taux 1.0</span><strong id="manualRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures taux 1.5</span><strong id="manualOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Brut estimé</span><strong id="manualGross">—</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="manualDeductions">—</strong></div><div class="payroll-row"><span>Net estimé</span><strong id="manualNet">—</strong></div></div><div class="payroll-note">Basé sur tes paies Metro réelles à 37,5 h et 40,5 h.</div></div><div class="card"><div class="card-label">Profil de paie</div><div class="payroll-row"><span>Taux horaire</span><strong id="payHourlyRateValue">À configurer</strong></div><div class="payroll-row"><span>Taux moyen de retenues</span><strong id="payDeductionRateValue">À configurer</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="payDeductions">—</strong></div><div class="payroll-row"><span>Net PDF importé</span><strong id="payImportedNet">—</strong></div><div class="payroll-row"><span>Profil PDF</span><div class="payroll-profile-actions"><strong id="payImportedProfile">Aucun PDF importé</strong><button id="deletePaystubBtn" class="payroll-delete-btn" type="button">Supprimer</button></div></div><div class="payroll-inputs"><div><label class="payroll-label">Taux horaire</label><input id="payHourlyRateInput" type="number" step="0.01" placeholder="ex. 39.743"></div><div><label class="payroll-label">Retenues % manuel</label><input id="payDeductionRateInput" type="number" step="0.01" placeholder="auto"></div></div></div><div class="card"><div class="card-label">Importer une paie PDF</div><label class="payroll-import" for="paystubPdfInput">Importer un talon de paie PDF</label><input id="paystubPdfInput" type="file" accept="application/pdf" hidden><div class="payroll-note" id="paystubImportStatus">Le PDF est analysé localement dans ton navigateur.</div><a class="payroll-link" href="https://relevedepaie.metro.ca/" target="_blank" rel="noopener noreferrer">Ouvrir le site des relevés de paie Metro ↗</a></div>`;
+    v.innerHTML = `<div class="payroll-title">Calendrier de paie</div><div class="payroll-sub">Paie hebdomadaire estimée</div><div class="card"><div class="card-label">Semaine de paie</div><div id="payWeekChip" class="payroll-week-chip">Cette semaine</div><div class="payroll-week-nav"><button id="payPrevWeekBtn" type="button">← Préc.</button><button id="payThisWeekBtn" type="button">Cette semaine</button><button id="payNextWeekBtn" type="button">Suiv. →</button></div><div class="payroll-row"><span>Période sélectionnée</span><strong id="payWeekRange">—</strong></div><div class="payroll-row"><span>Heures travaillées</span><strong id="payWorkedHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.0</span><strong id="payRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.5</span><strong id="payOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Seuil taux 1.5</span><strong>Après 40,00 h</strong></div></div><div class="payroll-grid"><div class="payroll-card"><div class="payroll-label">Brut estimé</div><div class="payroll-value" id="payGross">—</div><div class="payroll-note">40 h max à 1.0, surplus à 1.5</div></div><div class="payroll-card"><div class="payroll-label">Net estimé</div><div class="payroll-value" id="payNet">—</div><div class="payroll-note">après retenues</div></div></div><div class="card manual-estimate-card"><div class="card-label">Estimation manuelle</div><div class="payroll-inputs"><div><label class="payroll-label">Nombre d'heures</label><input id="manualHoursInput" type="number" step="0.25" placeholder="ex. 40.50"></div><div><label class="payroll-label">Net estimé</label><input id="manualNetDisplay" type="text" readonly placeholder="—"></div></div><div class="manual-estimate-results"><div class="payroll-row"><span>Heures taux 1.0</span><strong id="manualRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures taux 1.5</span><strong id="manualOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Brut estimé</span><strong id="manualGross">—</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="manualDeductions">—</strong></div><div class="payroll-row"><span>Net estimé</span><strong id="manualNet">—</strong></div></div><div class="payroll-note">Basé sur tes paies Metro réelles à 37,5 h et 40,5 h.</div></div><div class="card"><div class="card-label">Profil de paie</div><div class="payroll-row"><span>Taux horaire</span><strong id="payHourlyRateValue">À configurer</strong></div><div class="payroll-row"><span>Taux moyen de retenues</span><strong id="payDeductionRateValue">À configurer</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="payDeductions">—</strong></div><div class="payroll-row"><span>Net PDF importé</span><strong id="payImportedNet">—</strong></div><div class="payroll-row"><span>Profil PDF</span><div class="payroll-profile-actions"><strong id="payImportedProfile">Aucun PDF importé</strong><button id="deletePaystubBtn" class="payroll-delete-btn" type="button">Supprimer</button></div></div><div class="payroll-inputs"><div><label class="payroll-label">Taux horaire</label><input id="payHourlyRateInput" type="number" step="0.01" placeholder="ex. 39.743"></div><div><label class="payroll-label">Retenues % manuel</label><input id="payDeductionRateInput" type="number" step="0.01" placeholder="auto"></div></div></div><div class="card"><div class="card-label">Importer une paie PDF</div><label class="payroll-import" for="paystubPdfInput">Importer un talon de paie PDF</label><input id="paystubPdfInput" type="file" accept="application/pdf" hidden><div class="payroll-note" id="paystubImportStatus">Le PDF est analysé localement dans ton navigateur.</div><a class="payroll-link" href="https://relevedepaie.metro.ca/" target="_blank" rel="noopener noreferrer">Ouvrir le site des relevés de paie Metro ↗</a></div>`;
     const header=document.querySelector('header'); if(header) header.insertAdjacentElement('afterend',v); else document.body.prepend(v);
   }
 
@@ -159,7 +159,9 @@
 
   function render(){
     const d=estimate(); if(!$('payWeekRange'))return;
-    $('payWeekRange').textContent=`${fmt(d.s.start)} au ${fmt(d.s.end)}`; $('payWorkedHours').textContent=hrs(d.s.worked); $('payRegularHours').textContent=hrs(d.s.regular); $('payOvertimeHours').textContent=hrs(d.s.overtime); $('payGross').textContent=money(d.gross); $('payNet').textContent=money(d.net); $('payDeductions').textContent=money(d.ded); $('payHourlyRateValue').textContent=d.r?money(d.r)+' / h':'À configurer'; $('payDeductionRateValue').textContent=d.dr?pct(d.dr):'Auto Metro'; $('payImportedNet').textContent=money(d.p.netPay); $('payImportedProfile').textContent=d.p.importedAt?`PDF importé le ${new Date(d.p.importedAt).toLocaleString('fr-CA')}`:'Aucun PDF importé';
+    $('payWeekRange').textContent=`${fmt(d.s.start)} au ${fmt(d.s.end)}`;
+    $('payWeekChip').textContent=weekLabel(d.s.offset);
+    $('payWorkedHours').textContent=hrs(d.s.worked); $('payRegularHours').textContent=hrs(d.s.regular); $('payOvertimeHours').textContent=hrs(d.s.overtime); $('payGross').textContent=money(d.gross); $('payNet').textContent=money(d.net); $('payDeductions').textContent=money(d.ded); $('payHourlyRateValue').textContent=d.r?money(d.r)+' / h':'À configurer'; $('payDeductionRateValue').textContent=d.dr?pct(d.dr):'Auto Metro'; $('payImportedNet').textContent=money(d.p.netPay); $('payImportedProfile').textContent=d.p.importedAt?`PDF importé le ${new Date(d.p.importedAt).toLocaleString('fr-CA')}`:'Aucun PDF importé';
     const del=$('deletePaystubBtn'); if(del) del.style.display=d.p.importedAt?'inline-flex':'none';
     renderManualEstimate();
   }
@@ -174,6 +176,10 @@
 
   function bind(){
     const r=$('payHourlyRateInput'), d=$('payDeductionRateInput'), pdf=$('paystubPdfInput'), mh=$('manualHoursInput'), del=$('deletePaystubBtn');
+    const prev=$('payPrevWeekBtn'), current=$('payThisWeekBtn'), next=$('payNextWeekBtn');
+    if(prev&&!prev.dataset.bound){ prev.dataset.bound=1; prev.onclick=()=>setWeekOffset(getWeekOffset()-1); }
+    if(current&&!current.dataset.bound){ current.dataset.bound=1; current.onclick=()=>setWeekOffset(0); }
+    if(next&&!next.dataset.bound){ next.dataset.bound=1; next.onclick=()=>setWeekOffset(getWeekOffset()+1); }
     if(del&&!del.dataset.bound){ del.dataset.bound=1; del.onclick=deleteImportedPaystub; }
     if(mh&&!mh.dataset.bound){ mh.dataset.bound=1; mh.value=localStorage.getItem('manualEstimateHours')||''; mh.oninput=()=>{ localStorage.setItem('manualEstimateHours', mh.value || ''); renderManualEstimate(); }; }
     if(r&&!r.dataset.bound){ r.dataset.bound=1; const saved=localStorage.getItem('payrollHourlyRate'); r.value=saved || DEFAULT_HOURLY_RATE; if(!saved) localStorage.setItem('payrollHourlyRate', String(DEFAULT_HOURLY_RATE)); r.oninput=()=>{ if(Number(r.value)>0)localStorage.setItem('payrollHourlyRate',r.value); render(); }; }
