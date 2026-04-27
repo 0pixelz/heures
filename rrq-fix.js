@@ -5,6 +5,10 @@
   window.__rrqFixLoaded = true;
 
   const RRQ_MAX_2026 = 4895;
+  // Base plus fiable pour l'estimation: semaine normale de 37,5 h.
+  // Exemple fourni: R.R.Q. courant 94,23 $, à date 1 216,71 $.
+  const RRQ_NORMAL_WEEKLY_37_5H = 94.23;
+
   const $ = (id) => document.getElementById(id);
   const money = (v) => v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' });
   const weeks = (v) => v == null || Number.isNaN(Number(v)) ? '—' : `${Math.ceil(v).toLocaleString('fr-CA')} sem.`;
@@ -78,7 +82,8 @@
       createRow('rrqYtdValue', 'RRQ accumulé'),
       createRow('rrqMaxValue', 'Maximum RRQ 2026'),
       createRow('rrqRemainingValue', 'RRQ restant à payer'),
-      createRow('rrqWeeklyValue', 'RRQ par semaine'),
+      createRow('rrqImportedWeeklyValue', 'RRQ semaine importée'),
+      createRow('rrqNormalWeeklyValue', 'RRQ semaine normale'),
       createRow('rrqWeeksRemainingValue', 'Semaines restantes RRQ'),
       createRow('rrqFinishWeekValue', 'Semaine estimée fin RRQ'),
       createRow('rrqFinishMonthValue', 'Mois estimé fin RRQ')
@@ -93,15 +98,20 @@
     const p = readProfile();
 
     const rrqYtd = valueOrNull(p.rrqYtd);
-    const rrqWeekly = valueOrNull(p.rrq);
+    const rrqImportedWeekly = valueOrNull(p.rrq);
+    const rrqNormalWeekly = RRQ_NORMAL_WEEKLY_37_5H;
     const remaining = rrqYtd != null ? Math.max(0, RRQ_MAX_2026 - rrqYtd) : null;
-    const weeksRemaining = remaining != null && rrqWeekly ? remaining / rrqWeekly : null;
+
+    // Important: on utilise la semaine normale pour l'estimation restante.
+    // Une semaine avec overtime fait monter le RRQ courant et rendrait l'estimation trop optimiste.
+    const weeksRemaining = remaining != null && rrqNormalWeekly ? remaining / rrqNormalWeekly : null;
     const finish = finishInfo(weeksRemaining);
 
     if ($('rrqYtdValue')) $('rrqYtdValue').textContent = money(rrqYtd);
     if ($('rrqMaxValue')) $('rrqMaxValue').textContent = money(RRQ_MAX_2026);
     if ($('rrqRemainingValue')) $('rrqRemainingValue').textContent = money(remaining);
-    if ($('rrqWeeklyValue')) $('rrqWeeklyValue').textContent = money(rrqWeekly);
+    if ($('rrqImportedWeeklyValue')) $('rrqImportedWeeklyValue').textContent = money(rrqImportedWeekly);
+    if ($('rrqNormalWeeklyValue')) $('rrqNormalWeeklyValue').textContent = money(rrqNormalWeekly);
     if ($('rrqWeeksRemainingValue')) $('rrqWeeksRemainingValue').textContent = weeks(weeksRemaining);
     if ($('rrqFinishWeekValue')) $('rrqFinishWeekValue').textContent = finish.week;
     if ($('rrqFinishMonthValue')) $('rrqFinishMonthValue').textContent = finish.month;
