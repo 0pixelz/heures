@@ -1,13 +1,16 @@
 // gemini-assistant-bridge.js
-// Hybrid assistant bridge: local rules first, Gemini for open questions.
-// Option A: backend endpoint in localStorage GEMINI_ASSISTANT_ENDPOINT
-// Option B: browser-only key in localStorage GEMINI_BROWSER_KEY
+// Hybrid assistant bridge: local rules first, Groq/Gemini for open questions.
+// Browser-only keys stored locally:
+// - GROQ_BROWSER_KEY
+// - GEMINI_BROWSER_KEY
 (() => {
   if (window.__geminiAssistantBridgeLoaded) return;
   window.__geminiAssistantBridgeLoaded = true;
 
   const DEFAULT_ENDPOINT = '/api/assistant';
   const MODEL_CACHE_KEY = 'GEMINI_SELECTED_MODEL';
+  const GROQ_MODEL_KEY = 'GROQ_SELECTED_MODEL';
+  const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
   const PREFERRED_MODELS = [
     'models/gemini-2.0-flash',
     'models/gemini-2.0-flash-lite',
@@ -63,8 +66,12 @@
     };
   }
 
+  function systemText() {
+    return "Tu es l'assistant intégré d'une application de suivi d'heures et de paie. Réponds en français québécois, clairement et brièvement. N'invente pas de chiffres. Règles: base régulière 37,5 h, overtime temps simple de 37,5 h à 40 h, overtime 1.5 au-dessus de 40 h. Les calculs locaux sont prioritaires.";
+  }
+
   function promptText(question) {
-    return `Tu es l'assistant intégré d'une application de suivi d'heures et de paie. Réponds en français québécois, clairement et brièvement. N'invente pas de chiffres. Règles: base régulière 37,5 h, overtime temps simple de 37,5 h à 40 h, overtime 1.5 au-dessus de 40 h. Les calculs locaux sont prioritaires.\n\nQuestion:\n${question}\n\nContexte local:\n${JSON.stringify(contextSnapshot(), null, 2)}`;
+    return `Question:\n${question}\n\nContexte local:\n${JSON.stringify(contextSnapshot(), null, 2)}`;
   }
 
   function addBotMessage(text) {
@@ -82,6 +89,35 @@
     const avatar = document.createElement('div'); avatar.className = 'ai-avatar'; avatar.textContent = 'ME';
     const msg = document.createElement('div'); msg.className = 'ai-msg user'; msg.textContent = text;
     row.appendChild(avatar); row.appendChild(msg); chat.appendChild(row); chat.scrollTop = chat.scrollHeight;
+  }
+
+  async function askGroq(question) {
+    const key = localStorage.getItem('GROQ_BROWSER_KEY');
+    if (!key) throw new Error('Aucune clé Groq locale configurée.');
+    const model = localStorage.getItem(GROQ_MODEL_KEY) || DEFAULT_GROQ_MODEL;
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.25,
+        max_tokens: 700,
+        messages: [
+          { role: 'system', content: systemText() },
+          { role: 'user', content: promptText(question) }
+        ]
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error?.message || 'Erreur Groq.');
+    return {
+      answer: data?.choices?.[0]?.message?.content?.trim() || 'Je n’ai pas reçu de réponse.',
+      provider: 'Groq',
+      model
+    };
   }
 
   async function listAvailableModels(key) {
@@ -112,7 +148,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: promptText(question) }] }],
+        contents: [{ role: 'user', parts: [{ text: systemText() + '\n\n' + promptText(question) }] }],
         generationConfig: { temperature: 0.25, topP: 0.9, maxOutputTokens: 700 }
       })
     });
@@ -121,18 +157,24 @@
     return data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim() || 'Je n’ai pas reçu de réponse.';
   }
 
-  async function askDirect(question) {
+  async function askGeminiDirect(question) {
     const browserKey = localStorage.getItem('GEMINI_BROWSER_KEY');
     if (!browserKey) throw new Error('Aucune clé Gemini locale configurée.');
-
     let modelName = await selectModel(browserKey);
     try {
-      return await generateWithModel(browserKey, modelName, question);
+      return {
+        answer: await generateWithModel(browserKey, modelName, question),
+        provider: 'Gemini',
+        model: modelName.replace('models/', '')
+      };
     } catch (error) {
-      // Si le modèle sauvegardé n'est plus disponible, on efface le cache et on réessaie une fois.
       localStorage.removeItem(MODEL_CACHE_KEY);
       modelName = await selectModel(browserKey);
-      return await generateWithModel(browserKey, modelName, question);
+      return {
+        answer: await generateWithModel(browserKey, modelName, question),
+        provider: 'Gemini',
+        model: modelName.replace('models/', '')
+      };
     }
   }
 
@@ -145,23 +187,25 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Erreur Gemini.');
-    return data.answer || 'Je n’ai pas reçu de réponse.';
+    return { answer: data.answer || 'Je n’ai pas reçu de réponse.', provider: 'Backend', model: data.model || '' };
   }
 
-  async function askGemini(question) {
-    return localStorage.getItem('GEMINI_BROWSER_KEY') ? askDirect(question) : askBackend(question);
+  async function askAI(question) {
+    if (localStorage.getItem('GROQ_BROWSER_KEY')) return askGroq(question);
+    if (localStorage.getItem('GEMINI_BROWSER_KEY')) return askGeminiDirect(question);
+    return askBackend(question);
   }
 
-  async function submitGemini(question) {
+  async function submitAI(question) {
     addUserMessage(question);
     const input = $('aiQuestionInput'); if (input) input.value = '';
-    const loading = addBotMessage(localStorage.getItem('GEMINI_BROWSER_KEY') ? 'Je cherche le meilleur modèle Gemini disponible…' : 'Je réfléchis avec Gemini…');
+    const provider = localStorage.getItem('GROQ_BROWSER_KEY') ? 'Groq' : localStorage.getItem('GEMINI_BROWSER_KEY') ? 'Gemini' : 'Backend';
+    const loading = addBotMessage(`Je réfléchis avec ${provider}…`);
     try {
-      const answer = await askGemini(question);
-      const model = localStorage.getItem(MODEL_CACHE_KEY);
-      if (loading) loading.textContent = model ? `${answer}\n\nModèle utilisé : ${model.replace('models/', '')}` : answer;
+      const result = await askAI(question);
+      if (loading) loading.textContent = `${result.answer}\n\nModèle utilisé : ${result.provider}${result.model ? ' / ' + result.model : ''}`;
     } catch (error) {
-      if (loading) loading.textContent = `Gemini n’est pas disponible pour le moment. ${error.message || ''}`.trim();
+      if (loading) loading.textContent = `${provider} n’est pas disponible pour le moment. ${error.message || ''}`.trim();
     }
   }
 
@@ -171,14 +215,14 @@
       if (!btn || btn.id !== 'aiSendBtn') return;
       const q = $('aiQuestionInput')?.value || '';
       if (!q.trim() || shouldUseLocal(q)) return;
-      event.preventDefault(); event.stopImmediatePropagation(); submitGemini(q.trim());
+      event.preventDefault(); event.stopImmediatePropagation(); submitAI(q.trim());
     }, true);
 
     document.addEventListener('keydown', event => {
       if (event.key !== 'Enter' || event.target?.id !== 'aiQuestionInput') return;
       const q = $('aiQuestionInput')?.value || '';
       if (!q.trim() || shouldUseLocal(q)) return;
-      event.preventDefault(); event.stopImmediatePropagation(); submitGemini(q.trim());
+      event.preventDefault(); event.stopImmediatePropagation(); submitAI(q.trim());
     }, true);
   }
 
