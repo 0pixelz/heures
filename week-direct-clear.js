@@ -1,5 +1,5 @@
 // week-direct-clear.js
-// Supprime une ligne de Ma semaine en sélectionnant la date et en vidant directement
+// Supprime rapidement une ligne de Ma semaine en vidant directement
 // les champs du formulaire principal: début, fin, repas, note.
 (() => {
   if (window.__weekDirectClearLoaded) return;
@@ -64,19 +64,16 @@
   }
 
   function clearFormFields() {
-    const timeInputs = Array.from(document.querySelectorAll('input[type="time"]'));
-    timeInputs.forEach(el => {
+    Array.from(document.querySelectorAll('input[type="time"]')).forEach(el => {
       el.value = '';
       fire(el);
     });
 
-    const textareas = Array.from(document.querySelectorAll('textarea'));
-    textareas.forEach(el => {
+    Array.from(document.querySelectorAll('textarea')).forEach(el => {
       el.value = '';
       fire(el);
     });
 
-    // Champs texte qui peuvent contenir début/fin dans certains navigateurs.
     Array.from(document.querySelectorAll('input:not([type="date"]):not([type="time"])')).forEach(el => {
       const label = norm(`${el.id} ${el.name} ${el.placeholder} ${el.className}`);
       if (label.includes('debut') || label.includes('fin') || label.includes('start') || label.includes('end') || label.includes('note')) {
@@ -85,7 +82,6 @@
       }
     });
 
-    // Remet les selects repas/pause au premier choix si possible.
     Array.from(document.querySelectorAll('select')).forEach(el => {
       const label = norm(`${el.id} ${el.name} ${el.className}`);
       if (label.includes('repas') || label.includes('meal') || label.includes('pause') || el.options.length <= 8) {
@@ -94,7 +90,6 @@
       }
     });
 
-    // Si un bouton Congé était actif, on remet Travail si disponible.
     const travailBtn = Array.from(document.querySelectorAll('button')).find(b => norm(b.textContent) === 'travail');
     if (travailBtn && !travailBtn.classList.contains('active')) travailBtn.click();
   }
@@ -154,6 +149,15 @@
     });
   }
 
+  function parseHours(text) {
+    const n = Number(String(text || '').replace(',', '.').match(/-?\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.') || 0);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatHours(n) {
+    return `${n.toFixed(2).replace('.', ',')} h`;
+  }
+
   function clearVisibleRow(wrap) {
     const hours = wrap?.querySelector('.week-day-hours');
     const extra = wrap?.querySelector('.week-day-extra');
@@ -168,6 +172,29 @@
     wrap?.classList.remove('revealed', 'revealed-left', 'deleting');
   }
 
+  function updateWeekTotal(removedHours) {
+    const totalEl = document.querySelector('.week-total .mono, .week-total-value, .week-total-hours');
+    if (!totalEl) return;
+    const current = parseHours(totalEl.textContent);
+    const next = Math.max(0, current - removedHours);
+    totalEl.textContent = formatHours(next);
+  }
+
+  function removeCalendarDot(key) {
+    const day = String(Number(key.slice(8, 10)));
+    const selectedMonth = Number(key.slice(5, 7));
+    const ym = currentYearMonth();
+    if (ym.m !== selectedMonth) return;
+
+    Array.from(document.querySelectorAll('.cal-day:not(.empty)')).forEach(el => {
+      const txt = el.querySelector('.cal-day-num')?.textContent || el.textContent || '';
+      const n = (txt.match(/\d+/)?.[0] || '');
+      if (n !== day) return;
+      el.classList.remove('has-entry', 'leave');
+      el.querySelectorAll('.cal-dot').forEach(dot => dot.remove());
+    });
+  }
+
   function toast(msg) {
     let el = document.querySelector('.toast');
     if (!el) {
@@ -177,7 +204,7 @@
     }
     el.textContent = msg;
     el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 1800);
+    setTimeout(() => el.classList.remove('show'), 1400);
   }
 
   function handle(e) {
@@ -197,18 +224,27 @@
     }
 
     const key = keyOf(d);
+    const removedHours = parseHours(wrap?.querySelector('.week-day-hours')?.textContent || '0');
     localStorage.setItem('weekDirectClearLastDate', key);
 
-    selectDate(key);
+    // Instant UI update first.
+    clearVisibleRow(wrap);
+    updateWeekTotal(removedHours);
+    removeCalendarDot(key);
+    toast('Journée supprimée');
+
+    // Then clear underlying data without a full page reload.
     setTimeout(() => {
-      clearFormFields();
-      cleanStorageForDate(key);
-      clearVisibleRow(wrap);
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new CustomEvent('hours-data-updated', { detail: { key, source: 'week-direct-clear' } }));
-      toast('Journée supprimée');
-      setTimeout(() => location.reload(), 500);
-    }, 450);
+      selectDate(key);
+      setTimeout(() => {
+        clearFormFields();
+        cleanStorageForDate(key);
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('hours-data-updated', { detail: { key, source: 'week-direct-clear' } }));
+        document.dispatchEvent(new Event('week-tools-refresh'));
+        busy = false;
+      }, 80);
+    }, 20);
   }
 
   window.addEventListener('click', handle, true);
