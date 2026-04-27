@@ -1,6 +1,7 @@
 // paystub-ui.js
 // Page Calendrier de paie hebdomadaire injectee sous le header.
 (() => {
+  const BASE_REGULAR_HOURS = 37.5;
   const REGULAR_PAY_LIMIT = 40;
   const DEFAULT_HOURLY_RATE = 39.743;
   const MAX_VALID_DEDUCTION_RATE = 0.75;
@@ -58,7 +59,21 @@
 
   function splitHours(totalHours){
     const worked = Math.max(0, Number(totalHours || 0));
-    return { worked, regular: Math.min(worked, REGULAR_PAY_LIMIT), overtime: Math.max(0, worked - REGULAR_PAY_LIMIT), threshold: REGULAR_PAY_LIMIT };
+    const baseRegular = Math.min(worked, BASE_REGULAR_HOURS);
+    const totalOvertime = Math.max(0, worked - BASE_REGULAR_HOURS);
+    const simpleOvertime = Math.min(totalOvertime, REGULAR_PAY_LIMIT - BASE_REGULAR_HOURS);
+    const premiumOvertime = Math.max(0, worked - REGULAR_PAY_LIMIT);
+    const regularPayHours = Math.min(worked, REGULAR_PAY_LIMIT);
+    return {
+      worked,
+      baseRegular,
+      totalOvertime,
+      simpleOvertime,
+      regular: regularPayHours,
+      overtime: premiumOvertime,
+      threshold: REGULAR_PAY_LIMIT,
+      baseThreshold: BASE_REGULAR_HOURS
+    };
   }
 
   function summary(){
@@ -135,7 +150,7 @@
   function view(){
     if ($('payrollView')) return;
     const v=document.createElement('main'); v.id='payrollView';
-    v.innerHTML = `<div class="payroll-title">Calendrier de paie</div><div class="payroll-sub">Paie hebdomadaire estimée</div><div class="card"><div class="card-label">Semaine de paie</div><div id="payWeekChip" class="payroll-week-chip">Cette semaine</div><div class="payroll-week-nav"><button id="payPrevWeekBtn" type="button">← Préc.</button><button id="payThisWeekBtn" type="button">Cette semaine</button><button id="payNextWeekBtn" type="button">Suiv. →</button></div><div class="payroll-row"><span>Période sélectionnée</span><strong id="payWeekRange">—</strong></div><div class="payroll-row"><span>Heures travaillées</span><strong id="payWorkedHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.0</span><strong id="payRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.5</span><strong id="payOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Seuil taux 1.5</span><strong>Après 40,00 h</strong></div></div><div class="payroll-grid"><div class="payroll-card"><div class="payroll-label">Brut estimé</div><div class="payroll-value" id="payGross">—</div><div class="payroll-note">40 h max à 1.0, surplus à 1.5</div></div><div class="payroll-card"><div class="payroll-label">Net estimé</div><div class="payroll-value" id="payNet">—</div><div class="payroll-note">après retenues</div></div></div><div class="card manual-estimate-card"><div class="card-label">Estimation manuelle</div><div class="payroll-inputs"><div><label class="payroll-label">Nombre d'heures</label><input id="manualHoursInput" type="number" step="0.25" placeholder="ex. 40.50"></div><div><label class="payroll-label">Net estimé</label><input id="manualNetDisplay" type="text" readonly placeholder="—"></div></div><div class="manual-estimate-results"><div class="payroll-row"><span>Heures taux 1.0</span><strong id="manualRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Heures taux 1.5</span><strong id="manualOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Brut estimé</span><strong id="manualGross">—</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="manualDeductions">—</strong></div><div class="payroll-row"><span>Net estimé</span><strong id="manualNet">—</strong></div></div><div class="payroll-note">Basé sur tes paies Metro réelles à 37,5 h et 40,5 h.</div></div><div class="card"><div class="card-label">Profil de paie</div><div class="payroll-row"><span>Taux horaire</span><strong id="payHourlyRateValue">À configurer</strong></div><div class="payroll-row"><span>Taux moyen de retenues</span><strong id="payDeductionRateValue">À configurer</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="payDeductions">—</strong></div><div class="payroll-row"><span>Net PDF importé</span><strong id="payImportedNet">—</strong></div><div class="payroll-row"><span>Profil PDF</span><div class="payroll-profile-actions"><strong id="payImportedProfile">Aucun PDF importé</strong><button id="deletePaystubBtn" class="payroll-delete-btn" type="button">Supprimer</button></div></div><div class="payroll-inputs"><div><label class="payroll-label">Taux horaire</label><input id="payHourlyRateInput" type="number" step="0.01" placeholder="ex. 39.743"></div><div><label class="payroll-label">Retenues % manuel</label><input id="payDeductionRateInput" type="number" step="0.01" placeholder="auto"></div></div></div><div class="card"><div class="card-label">Importer une paie PDF</div><label class="payroll-import" for="paystubPdfInput">Importer un talon de paie PDF</label><input id="paystubPdfInput" type="file" accept="application/pdf" hidden><div class="payroll-note" id="paystubImportStatus">Le PDF est analysé localement dans ton navigateur.</div><a class="payroll-link" href="https://relevedepaie.metro.ca/" target="_blank" rel="noopener noreferrer">Ouvrir le site des relevés de paie Metro ↗</a></div>`;
+    v.innerHTML = `<div class="payroll-title">Calendrier de paie</div><div class="payroll-sub">Paie hebdomadaire estimée</div><div class="card"><div class="card-label">Semaine de paie</div><div id="payWeekChip" class="payroll-week-chip">Cette semaine</div><div class="payroll-week-nav"><button id="payPrevWeekBtn" type="button">← Préc.</button><button id="payThisWeekBtn" type="button">Cette semaine</button><button id="payNextWeekBtn" type="button">Suiv. →</button></div><div class="payroll-row"><span>Période sélectionnée</span><strong id="payWeekRange">—</strong></div><div class="payroll-row"><span>Heures travaillées</span><strong id="payWorkedHours">0,00 h</strong></div><div class="payroll-row"><span>Base régulière</span><strong id="payBaseRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime total</span><strong id="payTotalOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime temps simple</span><strong id="paySimpleOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime taux 1.5</span><strong id="payOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.0</span><strong id="payRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Base overtime</span><strong>Après 37,50 h</strong></div><div class="payroll-row"><span>Seuil taux 1.5</span><strong>Après 40,00 h</strong></div></div><div class="payroll-grid"><div class="payroll-card"><div class="payroll-label">Brut estimé</div><div class="payroll-value" id="payGross">—</div><div class="payroll-note">37,5 h base, 37,5 à 40 h temps simple, surplus à 1.5</div></div><div class="payroll-card"><div class="payroll-label">Net estimé</div><div class="payroll-value" id="payNet">—</div><div class="payroll-note">après retenues</div></div></div><div class="card manual-estimate-card"><div class="card-label">Estimation manuelle</div><div class="payroll-inputs"><div><label class="payroll-label">Nombre d'heures</label><input id="manualHoursInput" type="number" step="0.25" placeholder="ex. 40.50"></div><div><label class="payroll-label">Net estimé</label><input id="manualNetDisplay" type="text" readonly placeholder="—"></div></div><div class="manual-estimate-results"><div class="payroll-row"><span>Base régulière</span><strong id="manualBaseRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime total</span><strong id="manualTotalOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime temps simple</span><strong id="manualSimpleOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Overtime taux 1.5</span><strong id="manualOvertimeHours">0,00 h</strong></div><div class="payroll-row"><span>Heures payées taux 1.0</span><strong id="manualRegularHours">0,00 h</strong></div><div class="payroll-row"><span>Brut estimé</span><strong id="manualGross">—</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="manualDeductions">—</strong></div><div class="payroll-row"><span>Net estimé</span><strong id="manualNet">—</strong></div></div><div class="payroll-note">Basé sur tes paies Metro réelles à 37,5 h et 40,5 h.</div></div><div class="card"><div class="card-label">Profil de paie</div><div class="payroll-row"><span>Taux horaire</span><strong id="payHourlyRateValue">À configurer</strong></div><div class="payroll-row"><span>Taux moyen de retenues</span><strong id="payDeductionRateValue">À configurer</strong></div><div class="payroll-row"><span>Retenues estimées</span><strong id="payDeductions">—</strong></div><div class="payroll-row"><span>Net PDF importé</span><strong id="payImportedNet">—</strong></div><div class="payroll-row"><span>Profil PDF</span><div class="payroll-profile-actions"><strong id="payImportedProfile">Aucun PDF importé</strong><button id="deletePaystubBtn" class="payroll-delete-btn" type="button">Supprimer</button></div></div><div class="payroll-inputs"><div><label class="payroll-label">Taux horaire</label><input id="payHourlyRateInput" type="number" step="0.01" placeholder="ex. 39.743"></div><div><label class="payroll-label">Retenues % manuel</label><input id="payDeductionRateInput" type="number" step="0.01" placeholder="auto"></div></div></div><div class="card"><div class="card-label">Importer une paie PDF</div><label class="payroll-import" for="paystubPdfInput">Importer un talon de paie PDF</label><input id="paystubPdfInput" type="file" accept="application/pdf" hidden><div class="payroll-note" id="paystubImportStatus">Le PDF est analysé localement dans ton navigateur.</div><a class="payroll-link" href="https://relevedepaie.metro.ca/" target="_blank" rel="noopener noreferrer">Ouvrir le site des relevés de paie Metro ↗</a></div>`;
     const header=document.querySelector('header'); if(header) header.insertAdjacentElement('afterend',v); else document.body.prepend(v);
   }
 
@@ -149,6 +164,9 @@
     const input=$('manualHoursInput'); if(!input) return;
     const value=Number(input.value || 0);
     const d=estimateFromHours(value);
+    if($('manualBaseRegularHours')) $('manualBaseRegularHours').textContent=hrs(d.s.baseRegular);
+    if($('manualTotalOvertimeHours')) $('manualTotalOvertimeHours').textContent=hrs(d.s.totalOvertime);
+    if($('manualSimpleOvertimeHours')) $('manualSimpleOvertimeHours').textContent=hrs(d.s.simpleOvertime);
     $('manualRegularHours').textContent=hrs(d.s.regular);
     $('manualOvertimeHours').textContent=hrs(d.s.overtime);
     $('manualGross').textContent=money(d.gross);
@@ -161,7 +179,19 @@
     const d=estimate(); if(!$('payWeekRange'))return;
     $('payWeekRange').textContent=`${fmt(d.s.start)} au ${fmt(d.s.end)}`;
     $('payWeekChip').textContent=weekLabel(d.s.offset);
-    $('payWorkedHours').textContent=hrs(d.s.worked); $('payRegularHours').textContent=hrs(d.s.regular); $('payOvertimeHours').textContent=hrs(d.s.overtime); $('payGross').textContent=money(d.gross); $('payNet').textContent=money(d.net); $('payDeductions').textContent=money(d.ded); $('payHourlyRateValue').textContent=d.r?money(d.r)+' / h':'À configurer'; $('payDeductionRateValue').textContent=d.dr?pct(d.dr):'Auto Metro'; $('payImportedNet').textContent=money(d.p.netPay); $('payImportedProfile').textContent=d.p.importedAt?`PDF importé le ${new Date(d.p.importedAt).toLocaleString('fr-CA')}`:'Aucun PDF importé';
+    $('payWorkedHours').textContent=hrs(d.s.worked);
+    if($('payBaseRegularHours')) $('payBaseRegularHours').textContent=hrs(d.s.baseRegular);
+    if($('payTotalOvertimeHours')) $('payTotalOvertimeHours').textContent=hrs(d.s.totalOvertime);
+    if($('paySimpleOvertimeHours')) $('paySimpleOvertimeHours').textContent=hrs(d.s.simpleOvertime);
+    $('payRegularHours').textContent=hrs(d.s.regular);
+    $('payOvertimeHours').textContent=hrs(d.s.overtime);
+    $('payGross').textContent=money(d.gross);
+    $('payNet').textContent=money(d.net);
+    $('payDeductions').textContent=money(d.ded);
+    $('payHourlyRateValue').textContent=d.r?money(d.r)+' / h':'À configurer';
+    $('payDeductionRateValue').textContent=d.dr?pct(d.dr):'Auto Metro';
+    $('payImportedNet').textContent=money(d.p.netPay);
+    $('payImportedProfile').textContent=d.p.importedAt?`PDF importé le ${new Date(d.p.importedAt).toLocaleString('fr-CA')}`:'Aucun PDF importé';
     const del=$('deletePaystubBtn'); if(del) del.style.display=d.p.importedAt?'inline-flex':'none';
     renderManualEstimate();
   }
