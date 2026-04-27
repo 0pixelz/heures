@@ -1,5 +1,5 @@
 // week-tools.js
-// Swipe vers la droite seulement sur les lignes de Ma semaine + bouton pour supprimer toute la semaine.
+// Swipe vers la gauche seulement sur les lignes de Ma semaine + bouton pour supprimer toute la semaine.
 (() => {
   if (window.__weekToolsLoaded) return;
   window.__weekToolsLoaded = true;
@@ -93,12 +93,12 @@
       .week-tools-delete.confirm{background:rgba(229,107,107,.16);border-color:var(--danger)}
       .week-tools-hint{font-size:11px;color:var(--text-faint);text-align:center;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
       .week-row-swipe-wrap{position:relative;overflow:hidden;border-radius:var(--radius-sm);touch-action:pan-y;background:rgba(229,107,107,.10)}
-      .week-row-swipe-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-start;padding:0 18px;background:linear-gradient(270deg,transparent 0%,rgba(229,107,107,.18) 38%,rgba(229,107,107,.38) 100%);color:var(--danger);font-weight:900;letter-spacing:.06em;text-transform:uppercase;font-size:11px;opacity:0;transition:opacity .14s ease;pointer-events:auto;cursor:pointer}
+      .week-row-swipe-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 18px;background:linear-gradient(90deg,transparent 0%,rgba(229,107,107,.18) 38%,rgba(229,107,107,.38) 100%);color:var(--danger);font-weight:900;letter-spacing:.06em;text-transform:uppercase;font-size:11px;opacity:0;transition:opacity .14s ease;pointer-events:auto;cursor:pointer}
       .week-row-swipe-content{position:relative;transition:transform .2s ease,opacity .2s ease;will-change:transform;border-radius:var(--radius-sm);background:var(--bg-elev)}
       .week-row-swipe-content > .week-day{margin:0!important}
       .week-row-swipe-wrap.revealed .week-row-swipe-bg{opacity:1}
-      .week-row-swipe-wrap.revealed .week-row-swipe-content{transform:translateX(96px)}
-      .week-row-swipe-wrap.deleting .week-row-swipe-content{transform:translateX(120%);opacity:.2}
+      .week-row-swipe-wrap.revealed .week-row-swipe-content{transform:translateX(-96px)}
+      .week-row-swipe-wrap.deleting .week-row-swipe-content{transform:translateX(-120%);opacity:.2}
     `;
     document.head.appendChild(st);
   }
@@ -208,7 +208,7 @@
     actions.className = 'week-tools-actions';
     actions.innerHTML = `
       <button id="deleteCurrentWeekBtn" class="week-tools-delete" type="button">Supprimer les heures de cette semaine</button>
-      <div class="week-tools-hint">Glisse seulement une ligne vers la droite pour supprimer ce jour</div>
+      <div class="week-tools-hint">Glisse seulement une ligne vers la gauche pour supprimer ce jour</div>
     `;
     card.appendChild(actions);
   }
@@ -275,16 +275,16 @@
       const dy = e.touches[0].clientY - startY;
       if (Math.abs(dy) > Math.abs(dx) * 1.15) return;
 
-      // Swipe gauche désactivé: on ne bouge pas si dx <= 0.
-      if (dx <= 0) {
+      // Swipe droite désactivé: on ne bouge pas si dx >= 0.
+      if (dx >= 0) {
         activeContent.style.transform = '';
         if (activeBg) activeBg.style.opacity = '0';
         return;
       }
 
-      const clamped = Math.min(142, dx);
+      const clamped = Math.max(-142, dx);
       activeContent.style.transform = `translateX(${clamped}px)`;
-      if (activeBg) activeBg.style.opacity = String(Math.min(1, clamped / 80));
+      if (activeBg) activeBg.style.opacity = String(Math.min(1, Math.abs(clamped) / 80));
     }, { passive: true });
 
     document.addEventListener('touchend', e => {
@@ -303,8 +303,8 @@
       activeBg = null;
       tracking = false;
 
-      // Swipe gauche ou geste vertical: on ignore.
-      if (dx <= 0 || Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) {
+      // Swipe droite ou geste vertical: on ignore.
+      if (dx >= 0 || Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.25) {
         resetRow(wrap);
         return;
       }
