@@ -7,6 +7,7 @@
   const DELETED_KEY = 'deletedWeekDatesV2';
   const MONTHS = { janv:0, fevr:1, fevrier:1, mars:2, avr:3, avril:3, mai:4, juin:5, juil:6, aout:7, sept:8, oct:9, novembre:10, nov:10, dec:11, decembre:11 };
   let deleting = false;
+  let lastApply = 0;
 
   const norm = v => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').trim();
   const pad = n => String(n).padStart(2, '0');
@@ -135,12 +136,12 @@
     const hours = wrap.querySelector('.week-day-hours');
     const extra = wrap.querySelector('.week-day-extra');
     const quick = wrap.querySelector('.week-day-quick');
-    if (hours) {
+    if (hours && hours.textContent !== '—') {
       hours.textContent = '—';
       hours.classList.add('empty');
       hours.classList.remove('overtime', 'leave');
     }
-    if (extra) {
+    if (extra && extra.textContent !== '') {
       extra.textContent = '';
       extra.classList.remove('overtime');
     }
@@ -149,6 +150,10 @@
   }
 
   function clearTombstonedRows() {
+    const now = Date.now();
+    if (now - lastApply < 250) return;
+    lastApply = now;
+
     const deleted = readDeleted();
     if (!deleted.size) return;
     document.querySelectorAll('.week-row-swipe-wrap').forEach(wrap => {
@@ -208,14 +213,17 @@
     deleteRow(btn);
   }
 
-  // Click only: avoids mobile double execution/freeze caused by pointerup + touchend + click.
   window.addEventListener('click', handleDeleteEvent, true);
 
-  const observer = new MutationObserver(clearTombstonedRows);
   function start() {
     clearTombstonedRows();
-    observer.observe(document.body, { childList:true, subtree:true });
-    setInterval(clearTombstonedRows, 1200);
+    document.addEventListener('click', event => {
+      if (event.target?.closest?.('.cal-day, .week-row-swipe-wrap, input[type="date"]')) {
+        setTimeout(clearTombstonedRows, 150);
+      }
+    }, true);
+    window.addEventListener('storage', () => setTimeout(clearTombstonedRows, 150));
+    window.addEventListener('hours-data-updated', () => setTimeout(clearTombstonedRows, 150));
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
