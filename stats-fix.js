@@ -263,6 +263,7 @@
         <div class="stats-row"><span>Overtime taux 1.5</span><strong id="statsPremiumOtFix">0,00 h</strong></div>
         <div class="stats-row"><span>Brut estimé</span><strong id="statsGrossFix">—</strong></div>
         <div class="stats-row"><span>Retenues estimées</span><strong id="statsDeductionsFix">—</strong></div>
+        <div class="stats-row"><span>Net estimé</span><strong id="statsNetDetailFix">—</strong></div>
         <div class="stats-row"><span>Meilleure semaine</span><strong id="statsBestWeekFix">—</strong></div>
       </div>
       <div class="card">
@@ -331,6 +332,7 @@
     if ($('statsPremiumOtFix')) $('statsPremiumOtFix').textContent = `${fmt(s.otPremium)} h`;
     if ($('statsGrossFix')) $('statsGrossFix').textContent = money(s.gross);
     if ($('statsDeductionsFix')) $('statsDeductionsFix').textContent = money(s.deductions);
+    if ($('statsNetDetailFix')) $('statsNetDetailFix').textContent = money(s.net);
     if ($('statsBestWeekFix')) $('statsBestWeekFix').textContent = s.bestWeek ? `${formatDate(s.bestWeek.start)} · ${fmt(s.bestWeek.hours)} h` : '—';
     if ($('statsProjHours')) $('statsProjHours').textContent = `${fmt(s.projected.hours)} h`;
     if ($('statsProjOt')) $('statsProjOt').textContent = `${fmt(s.projected.overtime)} h`;
