@@ -1,5 +1,5 @@
 // week-tools.js
-// Ajoute le swipe de semaine et la suppression des heures de la semaine affichée.
+// Swipe style Gmail sur la carte Ma semaine: révèle / confirme la suppression de la semaine.
 (() => {
   if (window.__weekToolsLoaded) return;
   window.__weekToolsLoaded = true;
@@ -50,36 +50,20 @@
     const input = getDateInput();
     const fromInput = parseISODate(input?.value);
     if (fromInput) return fromInput;
-
-    const selected = document.querySelector('.cal-day.selected:not(.empty) .cal-day-num, .cal-day.selected:not(.empty)');
-    const monthTitle = document.querySelector('.cal-month')?.textContent || '';
-    const dayNum = Number((selected?.textContent || '').match(/\d+/)?.[0]);
-    if (dayNum && monthTitle) {
-      const now = new Date();
-      const tryDate = new Date(now.getFullYear(), now.getMonth(), dayNum);
-      tryDate.setHours(0, 0, 0, 0);
-      return tryDate;
-    }
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return today;
   }
 
-  function setSelectedDate(date) {
+  function refreshCurrentDate() {
     const input = getDateInput();
-    const value = dkey(date);
     if (input) {
-      input.value = value;
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
     }
-
-    window.dispatchEvent(new CustomEvent('week-tools-date-change', { detail: { date: value } }));
-    setTimeout(() => {
-      window.dispatchEvent(new Event('storage'));
-      document.dispatchEvent(new Event('week-tools-refresh'));
-    }, 80);
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('hours-data-updated'));
+    document.dispatchEvent(new Event('week-tools-refresh'));
   }
 
   function findWeekCard() {
@@ -108,7 +92,14 @@
       .week-tools-delete{width:100%;padding:11px;border-radius:var(--radius-sm);border:1px solid rgba(229,107,107,.45);background:rgba(229,107,107,.08);color:var(--danger);font-family:var(--font-body);font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
       .week-tools-delete.confirm{background:rgba(229,107,107,.16);border-color:var(--danger)}
       .week-tools-hint{font-size:11px;color:var(--text-faint);text-align:center;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
-      .week-swipe-feedback{transition:transform .18s ease, opacity .18s ease;will-change:transform}
+      .week-swipe-wrap{position:relative;overflow:hidden;border-radius:var(--radius)}
+      .week-swipe-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 22px;background:linear-gradient(90deg,transparent 0%,rgba(229,107,107,.16) 35%,rgba(229,107,107,.34) 100%);color:var(--danger);font-weight:900;letter-spacing:.06em;text-transform:uppercase;font-size:12px;opacity:0;transition:opacity .15s ease;pointer-events:none}
+      .week-swipe-bg.left{justify-content:flex-start;background:linear-gradient(270deg,transparent 0%,rgba(229,107,107,.16) 35%,rgba(229,107,107,.34) 100%)}
+      .week-swipe-content{position:relative;background:var(--bg-elev);transition:transform .2s ease,opacity .2s ease;will-change:transform;border-radius:var(--radius)}
+      .week-swipe-wrap.revealed .week-swipe-bg{opacity:1}
+      .week-swipe-wrap.revealed .week-swipe-content{transform:translateX(-96px)}
+      .week-swipe-wrap.revealed-left .week-swipe-content{transform:translateX(96px)}
+      .week-swipe-wrap.deleting .week-swipe-content{transform:translateX(-120%);opacity:.2}
     `;
     document.head.appendChild(st);
   }
@@ -140,32 +131,74 @@
       writeJson(storageKey, data);
     });
 
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new CustomEvent('hours-data-updated', { detail: { deletedWeek: keys } }));
-    const current = getSelectedDate();
-    setSelectedDate(current);
+    refreshCurrentDate();
     toast(removed ? 'Heures de la semaine supprimées' : 'Aucune heure à supprimer cette semaine');
+  }
+
+  function resetSwipe(card) {
+    const wrap = card?.querySelector(':scope > .week-swipe-wrap');
+    if (!wrap) return;
+    wrap.classList.remove('revealed', 'revealed-left', 'deleting');
+    const content = wrap.querySelector('.week-swipe-content');
+    if (content) {
+      content.style.transform = '';
+      content.style.opacity = '';
+      content.style.transition = '';
+    }
+    const bg = wrap.querySelector('.week-swipe-bg');
+    if (bg) bg.classList.remove('left');
+  }
+
+  function confirmDeleteViaSwipe(card) {
+    const wrap = card?.querySelector(':scope > .week-swipe-wrap');
+    if (!wrap) return;
+    if (!wrap.classList.contains('revealed') && !wrap.classList.contains('revealed-left')) {
+      wrap.classList.add('revealed');
+      toast('Glisse encore ou touche Supprimer pour confirmer');
+      setTimeout(() => resetSwipe(card), 3200);
+      return;
+    }
+    wrap.classList.add('deleting');
+    setTimeout(() => {
+      deleteWeek();
+      resetSwipe(card);
+    }, 220);
+  }
+
+  function ensureSwipeStructure(card) {
+    if (!card || card.querySelector(':scope > .week-swipe-wrap')) return;
+
+    const children = Array.from(card.childNodes);
+    const wrap = document.createElement('div');
+    wrap.className = 'week-swipe-wrap';
+    const bg = document.createElement('div');
+    bg.className = 'week-swipe-bg';
+    bg.textContent = 'Supprimer';
+    const content = document.createElement('div');
+    content.className = 'week-swipe-content';
+
+    children.forEach(node => content.appendChild(node));
+    wrap.appendChild(bg);
+    wrap.appendChild(content);
+    card.appendChild(wrap);
   }
 
   function ensureActions() {
     ensureStyles();
     const card = findWeekCard();
-    if (!card || card.querySelector('#deleteCurrentWeekBtn')) return;
+    if (!card) return;
+    ensureSwipeStructure(card);
 
-    card.classList.add('week-swipe-feedback');
+    const content = card.querySelector('.week-swipe-content');
+    if (!content || content.querySelector('#deleteCurrentWeekBtn')) return;
 
     const actions = document.createElement('div');
     actions.className = 'week-tools-actions';
     actions.innerHTML = `
       <button id="deleteCurrentWeekBtn" class="week-tools-delete" type="button">Supprimer les heures de cette semaine</button>
-      <div class="week-tools-hint">Glisse la carte vers la gauche ou la droite pour changer de semaine</div>
+      <div class="week-tools-hint">Glisse la carte vers la gauche comme Gmail pour supprimer</div>
     `;
-    card.appendChild(actions);
-  }
-
-  function navigateWeek(delta) {
-    const selected = getSelectedDate();
-    setSelectedDate(addDays(selected, delta * 7));
+    content.appendChild(actions);
   }
 
   function bindDelete() {
@@ -173,18 +206,29 @@
       const btn = e.target.closest('#deleteCurrentWeekBtn');
       if (!btn) return;
       e.preventDefault();
+      const card = findWeekCard();
       if (!btn.classList.contains('confirm')) {
         btn.classList.add('confirm');
         btn.textContent = 'Confirmer la suppression';
+        card?.querySelector('.week-swipe-wrap')?.classList.add('revealed');
         setTimeout(() => {
           btn.classList.remove('confirm');
           btn.textContent = 'Supprimer les heures de cette semaine';
-        }, 2600);
+          resetSwipe(card);
+        }, 3000);
         return;
       }
       btn.classList.remove('confirm');
       btn.textContent = 'Supprimer les heures de cette semaine';
-      deleteWeek();
+      confirmDeleteViaSwipe(card);
+    });
+
+    document.addEventListener('click', e => {
+      const wrap = e.target.closest('.week-swipe-wrap.revealed,.week-swipe-wrap.revealed-left');
+      if (!wrap) return;
+      if (e.target.closest('#deleteCurrentWeekBtn')) return;
+      const card = wrap.closest('.card');
+      resetSwipe(card);
     });
   }
 
@@ -192,35 +236,72 @@
     let startX = 0;
     let startY = 0;
     let activeCard = null;
+    let activeContent = null;
+    let activeBg = null;
+    let tracking = false;
 
     document.addEventListener('touchstart', e => {
       const card = e.target.closest('.card');
       if (!card || !card.querySelector('.week-list')) return;
+      const wrap = card.querySelector(':scope > .week-swipe-wrap');
+      if (!wrap) return;
       activeCard = card;
+      activeContent = wrap.querySelector('.week-swipe-content');
+      activeBg = wrap.querySelector('.week-swipe-bg');
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
+      tracking = true;
+      if (activeContent) activeContent.style.transition = 'none';
     }, { passive: true });
 
     document.addEventListener('touchmove', e => {
-      if (!activeCard) return;
+      if (!tracking || !activeCard || !activeContent) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 18) {
-        activeCard.style.transform = `translateX(${Math.max(-26, Math.min(26, dx / 5))}px)`;
+      if (Math.abs(dy) > Math.abs(dx) * 1.15) return;
+
+      const clamped = Math.max(-140, Math.min(110, dx));
+      activeContent.style.transform = `translateX(${clamped}px)`;
+      if (activeBg) {
+        activeBg.style.opacity = String(Math.min(1, Math.abs(clamped) / 80));
+        activeBg.classList.toggle('left', clamped > 0);
       }
     }, { passive: true });
 
     document.addEventListener('touchend', e => {
-      if (!activeCard) return;
+      if (!tracking || !activeCard || !activeContent) return;
       const changed = e.changedTouches[0];
       const dx = changed.clientX - startX;
       const dy = changed.clientY - startY;
-      activeCard.style.transform = '';
-      activeCard = null;
+      const card = activeCard;
+      const wrap = card.querySelector(':scope > .week-swipe-wrap');
 
-      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
-      // Swipe gauche = semaine suivante. Swipe droite = semaine précédente.
-      navigateWeek(dx < 0 ? 1 : -1);
+      activeContent.style.transition = '';
+      activeContent.style.transform = '';
+      if (activeBg) activeBg.style.opacity = '';
+
+      activeCard = null;
+      activeContent = null;
+      activeBg = null;
+      tracking = false;
+
+      if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.25) {
+        resetSwipe(card);
+        return;
+      }
+
+      if (Math.abs(dx) >= 150) {
+        if (wrap) wrap.classList.add(dx > 0 ? 'revealed-left' : 'revealed');
+        confirmDeleteViaSwipe(card);
+        return;
+      }
+
+      if (wrap) {
+        wrap.classList.toggle('revealed-left', dx > 0);
+        wrap.classList.toggle('revealed', dx < 0);
+        toast('Touche Supprimer ou glisse encore pour confirmer');
+        setTimeout(() => resetSwipe(card), 3600);
+      }
     }, { passive: true });
   }
 
