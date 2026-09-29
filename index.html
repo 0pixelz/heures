@@ -1696,6 +1696,16 @@
         <div class="sheet-action-desc" data-i18n="export.downloadDesc">Télécharge un fichier CSV sur ton appareil</div>
       </div>
     </button>
+
+    <button class="sheet-action" data-action="sharepoint">
+      <div class="sheet-action-icon" style="background:rgba(3,120,124,.16);color:#12a3a8">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10a4 4 0 00-.9-7.9A5.5 5.5 0 007 8.5"/><path d="M6.5 20a4.5 4.5 0 01-.5-9 5.5 5.5 0 0110.9-.9"/><path d="M12 13v7"/><path d="M9 17l3 3 3-3"/></svg>
+      </div>
+      <div class="sheet-action-text">
+        <div class="sheet-action-title" data-i18n="export.sharepoint">Envoyer vers SharePoint</div>
+        <div class="sheet-action-desc" data-i18n="export.sharepointDesc">Téléverse le PDF dans SharePoint (Microsoft)</div>
+      </div>
+    </button>
   </div>
 
   <!-- DUPLICATE SHEET -->
@@ -1865,6 +1875,7 @@
   </script>
   <script src="./paystub-pdf.js"></script>
   <script src="./paystub-ui.js"></script>
+  <script src="./sharepoint-export.js"></script>
   <script>
     // ============ STATE ============
     // Disable old external deletion patches injected by previous service-worker versions.
@@ -1928,6 +1939,13 @@
           onenote: 'Envoyer vers OneNote', onenoteDesc: 'Via le menu partage (OneNote, Drive…)',
           download: 'Sauvegarder en CSV', downloadDesc: 'Télécharge un fichier CSV sur ton appareil',
           pdf: 'Télécharger en PDF', pdfDesc: 'Rapport formaté, prêt à imprimer',
+          sharepoint: 'Envoyer vers SharePoint', sharepointDesc: 'Téléverse le PDF dans SharePoint (Microsoft)',
+          spNotConfigured: 'Configure SharePoint dans Paramètres d\'abord',
+          spConnecting: 'Connexion à Microsoft…',
+          spUploading: 'Téléversement vers SharePoint…',
+          spDone: 'PDF envoyé dans SharePoint ✓',
+          spError: 'Échec de l\'envoi vers SharePoint',
+          spCanceled: 'Connexion annulée',
           noEntries: 'Aucune entrée pour cette période',
           entries1: 'entrée', entriesN: 'entrées',
           subject: 'Heures supplémentaires – ',
@@ -2006,6 +2024,13 @@
           onenote: 'Send to OneNote', onenoteDesc: 'Via share menu (OneNote, Drive…)',
           download: 'Save as CSV', downloadDesc: 'Downloads a CSV file to your device',
           pdf: 'Download as PDF', pdfDesc: 'Formatted report, ready to print',
+          sharepoint: 'Send to SharePoint', sharepointDesc: 'Uploads the PDF to SharePoint (Microsoft)',
+          spNotConfigured: 'Configure SharePoint in Settings first',
+          spConnecting: 'Connecting to Microsoft…',
+          spUploading: 'Uploading to SharePoint…',
+          spDone: 'PDF uploaded to SharePoint ✓',
+          spError: 'Failed to send to SharePoint',
+          spCanceled: 'Sign-in canceled',
           noEntries: 'No entries for this period',
           entries1: 'entry', entriesN: 'entries',
           subject: 'Overtime hours – ',
@@ -3351,6 +3376,46 @@
       }
     }
 
+    async function doSharePoint() {
+      const keys = getEntriesForPeriod(currentPeriod);
+      if (!keys.length) return;
+      const sp = window.SharePointExport;
+      if (!sp || !sp.isConfigured()) {
+        showToast(t('export.spNotConfigured'));
+        return;
+      }
+      let blob;
+      try {
+        const bytes = buildPdf(keys, currentPeriod);
+        blob = new Blob([bytes], { type: 'application/pdf' });
+      } catch (err) {
+        console.error('PDF error:', err);
+        showToast('PDF error');
+        return;
+      }
+      const filename = 'heures-sup_' + formatPeriodSlug(currentPeriod) + '.pdf';
+      closeSheet();
+      try {
+        await sp.upload(blob, filename, {
+          onStatus: (stage) => {
+            if (stage === 'connecting') showToast(t('export.spConnecting'));
+            else if (stage === 'uploading') showToast(t('export.spUploading'));
+          }
+        });
+        showToast(t('export.spDone'));
+      } catch (err) {
+        if (err && err.code === 'canceled') showToast(t('export.spCanceled'));
+        else {
+          console.error('SharePoint upload error:', err);
+          showToast(t('export.spError'));
+        }
+      }
+    }
+
+    // Exposé pour le module SharePoint externe (sharepoint-export.js).
+    window.showToast = showToast;
+    window.appT = t;
+
     document.querySelectorAll('.sheet-action').forEach(btn => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.action;
@@ -3358,6 +3423,7 @@
         else if (action === 'share') doShare();
         else if (action === 'download') doDownload();
         else if (action === 'pdf') doPdf();
+        else if (action === 'sharepoint') doSharePoint();
       });
     });
 

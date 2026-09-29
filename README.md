@@ -38,11 +38,29 @@ Les jours de congé (sauf fin de semaine) comptent pour 7,5 h dans le total hebd
 - **Type de semaine** : Lundi–vendredi (5 jours) ou Dimanche–samedi (7 jours)
 
 ### Exports
-Quatre destinations possibles, chacune pour la période choisie (semaine / mois / tout) :
+Cinq destinations possibles, chacune pour la période choisie (semaine / mois / tout) :
 - **Courriel** — ouvre ton application courriel avec un résumé formaté
 - **Partage (OneNote, Drive, etc.)** — via le menu de partage Android
 - **Fichier CSV** — ouvrable dans Excel / Sheets / Numbers
 - **Rapport PDF** — mise en page propre avec tableau, totaux et date de génération, prêt à imprimer
+- **SharePoint (Microsoft)** — téléverse le rapport PDF directement dans une bibliothèque de documents SharePoint (voir « Configuration SharePoint » ci-dessous)
+
+#### Configuration SharePoint
+L'envoi vers SharePoint est **optionnel** et se configure dans **Paramètres paie → SharePoint (Microsoft)**. Contrairement au reste de l'app, cette option envoie le PDF à Microsoft — il faut donc se connecter à un compte Microsoft.
+
+Prérequis (une seule fois) : une **inscription d'application Azure AD** de type *Single-page application (SPA)*.
+1. Sur [portal.azure.com](https://portal.azure.com) → **Microsoft Entra ID → App registrations → New registration**.
+2. Type de plateforme : **Single-page application (SPA)**, et **URI de redirection** = l'adresse exacte où l'app est hébergée (par ex. `https://ton-utilisateur.github.io/heures-sup/`).
+3. Sous **API permissions**, ajoute la permission déléguée **Microsoft Graph → `Sites.ReadWrite.All`**.
+4. Copie l'**Application (client) ID**.
+
+Ensuite, dans l'app (Paramètres paie → SharePoint) :
+- **Client ID** : le *Application (client) ID* copié ci-dessus.
+- **Locataire (tenant)** : `common`, `organizations`, ou l'ID/domaine de ton organisation.
+- **URL du site SharePoint** : par ex. `https://contoso.sharepoint.com/sites/MonEquipe`.
+- **Dossier** (optionnel) : un sous-dossier dans la bibliothèque « Documents » (laisse vide pour la racine).
+
+Tout est stocké **uniquement sur ton appareil**. À la première utilisation, une fenêtre de connexion Microsoft s'ouvre ; la session est ensuite mémorisée.
 
 ### Installation sur téléphone (PWA)
 - Installable sur Android comme une vraie application
@@ -52,6 +70,8 @@ Quatre destinations possibles, chacune pour la période choisie (semaine / mois 
 ## Vie privée
 
 **Toutes tes données restent sur ton appareil.** Elles ne sont ni envoyées, ni partagées, ni sauvegardées ailleurs. Pas de compte, pas de serveur, pas d'analytics.
+
+**Seule exception :** si tu actives et utilises l'export **SharePoint** (voir plus haut), le rapport PDF que tu choisis d'envoyer est transmis à Microsoft via ta connexion à ton compte. Cet envoi est déclenché uniquement par toi, à la demande.
 
 Les données sont stockées dans le `localStorage` du navigateur. Si tu vides les données du site, désinstalles l'app, ou changes de téléphone, tu perdras ton historique. **Pense à exporter un PDF ou un CSV de temps en temps comme sauvegarde.**
 

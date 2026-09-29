@@ -1,4 +1,4 @@
-const CACHE = 'heures-sup-v22';
+const CACHE = 'heures-sup-v23';
 const ASSETS = [
   './',
   './index.html',
@@ -19,7 +19,8 @@ const ASSETS = [
   './gemini-key-settings.js',
   './paystub-history.js',
   './week-tools.js',
-  './week-direct-clear.js'
+  './week-direct-clear.js',
+  './sharepoint-export.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -57,6 +58,7 @@ async function withExtraScripts(response) {
   if (!html.includes('paystub-history.js')) scripts.push('<script src="./paystub-history.js"></script>');
   if (!html.includes('week-tools.js')) scripts.push('<script src="./week-tools.js"></script>');
   if (!html.includes('week-direct-clear.js')) scripts.push('<script src="./week-direct-clear.js"></script>');
+  if (!html.includes('sharepoint-export.js')) scripts.push('<script src="./sharepoint-export.js"></script>');
   if (scripts.length) html = html.replace('</body>', scripts.join('') + '</body>');
 
   return new Response(html, {
@@ -88,6 +90,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('/paystub-history.js') ||
     url.pathname.endsWith('/week-tools.js') ||
     url.pathname.endsWith('/week-direct-clear.js') ||
+    url.pathname.endsWith('/sharepoint-export.js') ||
     url.pathname.endsWith('/service-worker.js');
 
   if (isHtml) {
