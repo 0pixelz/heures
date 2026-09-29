@@ -19,6 +19,11 @@
   const $ = id => document.getElementById(id);
   const t = key => (typeof window.appT === 'function' ? window.appT(key) : key);
 
+  // URI de redirection utilisée par MSAL — identique partout pour éviter les erreurs de config.
+  function redirectUri() {
+    return window.location.href.split('#')[0].split('?')[0];
+  }
+
   // ---------- Config ----------
   function getConfig() {
     return {
@@ -71,12 +76,11 @@
     const key = cfg.clientId + '|' + cfg.tenant;
     if (msalInstance && msalInstanceKey === key) return msalInstance;
     await loadMsal();
-    const redirectUri = window.location.href.split('#')[0].split('?')[0];
     msalInstance = new window.msal.PublicClientApplication({
       auth: {
         clientId: cfg.clientId,
         authority: 'https://login.microsoftonline.com/' + cfg.tenant,
-        redirectUri
+        redirectUri: redirectUri()
       },
       cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
     });
@@ -224,10 +228,17 @@
         <button id="saveSharepointBtn" class="accent" type="button">Sauvegarder</button>
         <button id="removeSharepointBtn" class="sp-danger" type="button">Supprimer</button>
       </div>
+      <div class="pay-extra-row" style="align-items:flex-start;gap:8px;margin-top:12px">
+        <span style="flex:0 0 auto">URI de redirection<br><span class="sp-help" style="margin:0">à coller dans Azure</span></span>
+        <code id="spRedirectUri" style="flex:1 1 auto;word-break:break-all;text-align:right;font-size:12px;color:var(--accent-text)"></code>
+      </div>
+      <div class="pay-extra-actions">
+        <button id="copyRedirectUriBtn" type="button">Copier l'URI de redirection</button>
+      </div>
       <div id="spStatusText" class="sp-status">
         La configuration reste sur cet appareil. Il te faut une inscription d'application Azure AD
-        (type « Single-page application ») dont l'URI de redirection est l'adresse de cette app,
-        avec la permission déléguée « Sites.ReadWrite.All ».
+        (type « Single-page application ») dont l'URI de redirection est exactement l'adresse affichée
+        ci-dessus, avec la permission déléguée « Sites.ReadWrite.All ».
       </div>
     `;
     view.appendChild(card);
@@ -249,6 +260,8 @@
     if (siteInput && !siteInput.value) siteInput.value = cfg.siteUrl;
     const folderInput = $('spFolderInput');
     if (folderInput && !folderInput.value) folderInput.value = cfg.folder;
+    const uri = $('spRedirectUri');
+    if (uri) uri.textContent = redirectUri();
   }
 
   function save() {
@@ -276,12 +289,25 @@
     if (typeof window.showToast === 'function') window.showToast('SharePoint supprimé');
   }
 
+  function copyRedirectUri() {
+    const uri = redirectUri();
+    const done = () => { if (typeof window.showToast === 'function') window.showToast('URI de redirection copiée'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(uri).then(done).catch(() => {
+        window.prompt('Copie cette URI de redirection :', uri);
+      });
+    } else {
+      window.prompt('Copie cette URI de redirection :', uri);
+    }
+  }
+
   function bind() {
     document.addEventListener('click', e => {
       const btn = e.target.closest('button');
       if (!btn) return;
       if (btn.id === 'saveSharepointBtn') save();
       if (btn.id === 'removeSharepointBtn') remove();
+      if (btn.id === 'copyRedirectUriBtn') copyRedirectUri();
     });
   }
 
